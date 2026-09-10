@@ -3,7 +3,7 @@
   Outlook to Obsidian — Office Add-in Manifest
   =============================================
   This manifest is already pointed at its live host:
-    https://virtualjones.github.io/outlook-to-obsidian   (GitHub Pages, main branch, root)
+    https://hellb0rg.github.io/send-to-obsidian   (GitHub Pages, main branch, root)
 
   IF YOU FORK: replace every occurrence of that URL with your own Pages URL
     (https://<your-github-username>.github.io/<repo-name>) and generate a fresh
@@ -33,17 +33,17 @@
   xsi:type="MailApp">
 
   <!-- Unique add-in identifier — do NOT change after deployment -->
-  <Id>55267e54-b786-4113-a715-5b864213fa0b</Id>
+  <Id>aa32eddb-4fda-4d24-b9bc-d754a36d1f5c</Id>
   <Version>2.0.0.0</Version>
-  <ProviderName>virtualjones</ProviderName>
+  <ProviderName>hellb0rg</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
 
   <DisplayName DefaultValue="Send to Obsidian"/>
   <Description DefaultValue="Extract a calendar appointment or email message and create a formatted Obsidian note."/>
 
-  <IconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
-  <HighResolutionIconUrl DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
-  <SupportUrl DefaultValue="https://github.com/virtualjones/outlook-to-obsidian"/>
+  <IconUrl DefaultValue="https://hellb0rg.github.io/send-to-obsidian/icon128.png"/>
+  <HighResolutionIconUrl DefaultValue="https://hellb0rg.github.io/send-to-obsidian/icon128.png"/>
+  <SupportUrl DefaultValue="https://github.com/hellb0rg/send-to-obsidian"/>
 
   <Hosts>
     <Host Name="Mailbox"/>
@@ -63,13 +63,13 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/taskpane.html"/>
+        <SourceLocation DefaultValue="https://hellb0rg.github.io/send-to-obsidian/taskpane.html"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
     <Form xsi:type="ItemEdit">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/taskpane.html"/>
+        <SourceLocation DefaultValue="https://hellb0rg.github.io/send-to-obsidian/taskpane.html"/>
       </DesktopSettings>
     </Form>
   </FormSettings>
@@ -190,13 +190,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon16.png"/>
-        <bt:Image id="Icon.32"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon48.png"/>
-        <bt:Image id="Icon.80"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/icon128.png"/>
+        <bt:Image id="Icon.16"  DefaultValue="https://hellb0rg.github.io/send-to-obsidian/icon16.png"/>
+        <bt:Image id="Icon.32"  DefaultValue="https://hellb0rg.github.io/send-to-obsidian/icon48.png"/>
+        <bt:Image id="Icon.80"  DefaultValue="https://hellb0rg.github.io/send-to-obsidian/icon128.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/taskpane.html"/>
-        <bt:Url id="Commands.Url"  DefaultValue="https://virtualjones.github.io/outlook-to-obsidian/commands.html"/>
+        <bt:Url id="Taskpane.Url"  DefaultValue="https://hellb0rg.github.io/send-to-obsidian/taskpane.html"/>
+        <bt:Url id="Commands.Url"  DefaultValue="https://hellb0rg.github.io/send-to-obsidian/commands.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Group.Label"   DefaultValue="Obsidian"/>
