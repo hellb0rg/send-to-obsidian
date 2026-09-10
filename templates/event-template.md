@@ -21,44 +21,6 @@ tags:
 > **Location:** {{location}}  
 > **Organizer:** {{organizer}}
 
-## Attendees
+## Förberedelser
 
-{{attendees}}
-
-## Context & Preparation
-
-### Purpose
-
-What do I want to accomplish in this meeting?
-
-### Background
-
-Relevant context, links, documents or previous discussions.
-
-### Questions
-
-- 
-
-### Talking Points
-
-- 
-
-## Agenda
-
-{{body}}
-
-## Meeting Notes
-
-- 
-
-## Decisions
-
-- 
-
-## Action Items
-
-- [ ] 
-
-## Follow-up
-
-- 
+## Anteckningar
