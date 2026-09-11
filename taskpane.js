@@ -1323,7 +1323,7 @@ function getBodyMarkdown(item) {
           tmp.innerHTML = html;
 
           resolve(
-            (tmp.textContent || '').trim()
+            removeTeamsInviteText(tmp.textContent || '')
           );
 
           return;
@@ -1373,7 +1373,7 @@ function getBodyMarkdown(item) {
               .replace(/\n{3,}/g, '\n\n')
               .trim();
 
-          resolve(md);
+          resolve(removeTeamsInviteText(md));
         } catch (e) {
           console.warn(
             'Turndown conversion failed, using text fallback:',
@@ -1432,6 +1432,10 @@ function removeTeamsInviteLinks(html) {
 
 function removeTeamsInviteText(text) {
   return String(text || '')
+    .replace(
+      /(?:^|\n)[ \t]*(?:\*\*)?Microsoft Teams meeting(?:\*\*)?[ \t]*\n[\s\S]*?(?:\n[ \t]*For organizers:[^\n]*[ \t]*)/i,
+      ''
+    )
     .replace(
       /https?:\/\/(?:[\w-]+\.)?(?:teams\.microsoft\.com|teams\.live\.com)\/\S+/gi,
       ''
