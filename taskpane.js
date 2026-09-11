@@ -11,9 +11,25 @@
 
    Template placeholders use the form {{variable_name}}.
 
-   RSVP status is fetched via EWS (makeEwsRequestAsync) when possible,
-   preserving the behavior of the upstream Virtual-Jones implementation.
+   RSVP status is fetched via EWS (makeEwsRequestAsync) when possible.
    If EWS is unavailable, the add-in falls back to Office.js attendee data.
+
+   Meeting body processing pipeline:
+
+     Outlook HTML
+       ↓
+     cleanOutlookHtml()
+       ↓
+     removeTeamsInviteBlockHtml()
+       ↓
+     normalizeOutlookListNesting()
+       ↓
+     Turndown
+       ↓
+     removeTeamsInviteText()
+       ↓
+     compactMarkdown()
+
    ═══════════════════════════════════════════════════════════════════════════ */
 
 
@@ -43,38 +59,56 @@ Office.onReady(() => {
 });
 
 
-/* Returns 'message' or 'meeting' based on the current Outlook item. */
+/**
+ * Returns 'message' or 'meeting' based on the current Outlook item.
+ */
 function getCurrentItemType() {
   try {
-    const t = Office.context.mailbox.item?.itemType;
-    return t === Office.MailboxEnums.ItemType.Message ? 'message' : 'meeting';
+    const t =
+      Office.context.mailbox.item?.itemType;
+
+    return t === Office.MailboxEnums.ItemType.Message
+      ? 'message'
+      : 'meeting';
   } catch (_) {
     return 'meeting';
   }
 }
 
 
-/* Update button label and header to match the current context. */
+/**
+ * Update button label and header to match the current context.
+ */
 function applyContextLabels() {
-  const isMessage = getCurrentItemType() === 'message';
+  const isMessage =
+    getCurrentItemType() === 'message';
 
-  const btn = document.getElementById('extractBtn');
+  const btn =
+    document.getElementById('extractBtn');
+
   if (btn) {
-    btn.innerHTML = isMessage
-      ? '<span>📧</span><span>Extract Email Details</span>'
-      : '<span>📅</span><span>Extract Meeting Details</span>';
+    btn.innerHTML =
+      isMessage
+        ? '<span>📧</span><span>Extract Email Details</span>'
+        : '<span>📅</span><span>Extract Meeting Details</span>';
   }
 
-  const headerIcon = document.getElementById('headerIcon');
+  const headerIcon =
+    document.getElementById('headerIcon');
+
   if (headerIcon) {
-    headerIcon.textContent = isMessage ? '📧' : '📅';
+    headerIcon.textContent =
+      isMessage ? '📧' : '📅';
   }
 
-  const headerTitle = document.getElementById('headerTitle');
+  const headerTitle =
+    document.getElementById('headerTitle');
+
   if (headerTitle) {
-    headerTitle.textContent = isMessage
-      ? 'Send Email to Obsidian'
-      : 'Send Meeting to Obsidian';
+    headerTitle.textContent =
+      isMessage
+        ? 'Send Email to Obsidian'
+        : 'Send Meeting to Obsidian';
   }
 }
 
@@ -84,48 +118,92 @@ function applyContextLabels() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function bindUI() {
-  // Main panel
-  document.getElementById('extractBtn')
-    .addEventListener('click', onExtract);
+  document
+    .getElementById('extractBtn')
+    .addEventListener(
+      'click',
+      onExtract
+    );
 
-  document.getElementById('openObsidianBtn')
-    .addEventListener('click', onOpenObsidian);
+  document
+    .getElementById('openObsidianBtn')
+    .addEventListener(
+      'click',
+      onOpenObsidian
+    );
 
-  document.getElementById('copyBtn')
-    .addEventListener('click', onCopy);
+  document
+    .getElementById('copyBtn')
+    .addEventListener(
+      'click',
+      onCopy
+    );
 
-  document.getElementById('settingsBtn')
-    .addEventListener('click', () => showPanel('settings'));
+  document
+    .getElementById('settingsBtn')
+    .addEventListener(
+      'click',
+      () => showPanel('settings')
+    );
 
-  // Settings panel
-  document.getElementById('backBtn')
-    .addEventListener('click', () => showPanel('main'));
+  document
+    .getElementById('backBtn')
+    .addEventListener(
+      'click',
+      () => showPanel('main')
+    );
 
-  document.getElementById('saveSettingsBtn')
-    .addEventListener('click', onSaveSettings);
+  document
+    .getElementById('saveSettingsBtn')
+    .addEventListener(
+      'click',
+      onSaveSettings
+    );
 
-  // Preset buttons
-  document.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.target;
-      const value  = btn.dataset.value;
+  document
+    .querySelectorAll('.preset-btn')
+    .forEach(btn => {
+      btn.addEventListener(
+        'click',
+        () => {
+          const target =
+            btn.dataset.target;
 
-      if (target && value) {
-        document.getElementById(target).value = value;
+          const value =
+            btn.dataset.value;
 
-        if (target === 'vaultName' || target === 'folderPath') {
-          updateFolderPreview();
+          if (
+            target &&
+            value
+          ) {
+            document
+              .getElementById(target)
+              .value = value;
+
+            if (
+              target === 'vaultName' ||
+              target === 'folderPath'
+            ) {
+              updateFolderPreview();
+            }
+          }
         }
-      }
+      );
     });
-  });
 
-  // Live preview in settings
-  document.getElementById('vaultName')
-    .addEventListener('input', updateFolderPreview);
+  document
+    .getElementById('vaultName')
+    .addEventListener(
+      'input',
+      updateFolderPreview
+    );
 
-  document.getElementById('folderPath')
-    .addEventListener('input', updateFolderPreview);
+  document
+    .getElementById('folderPath')
+    .addEventListener(
+      'input',
+      updateFolderPreview
+    );
 }
 
 
@@ -134,13 +212,18 @@ function bindUI() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function showPanel(name) {
-  const isMain = name === 'main';
+  const isMain =
+    name === 'main';
 
-  document.getElementById('mainPanel').style.display =
-    isMain ? 'flex' : 'none';
+  document
+    .getElementById('mainPanel')
+    .style.display =
+      isMain ? 'flex' : 'none';
 
-  document.getElementById('settingsPanel').style.display =
-    isMain ? 'none' : 'flex';
+  document
+    .getElementById('settingsPanel')
+    .style.display =
+      isMain ? 'none' : 'flex';
 
   if (!isMain) {
     populateSettingsForm();
@@ -155,12 +238,20 @@ function showPanel(name) {
 
 function loadSettings() {
   try {
-    const rs = Office.context.roamingSettings;
+    const rs =
+      Office.context.roamingSettings;
 
-    for (const key of Object.keys(DEFAULT_SETTINGS)) {
-      const value = rs.get(key);
+    for (
+      const key
+      of Object.keys(DEFAULT_SETTINGS)
+    ) {
+      const value =
+        rs.get(key);
 
-      if (value !== undefined && value !== null) {
+      if (
+        value !== undefined &&
+        value !== null
+      ) {
         settings[key] = value;
       }
     }
@@ -174,130 +265,230 @@ function loadSettings() {
 
 function onSaveSettings() {
   const vaultName =
-    document.getElementById('vaultName').value.trim();
+    document
+      .getElementById('vaultName')
+      .value
+      .trim();
 
   const folderPath =
-    document.getElementById('folderPath').value.trim();
+    document
+      .getElementById('folderPath')
+      .value
+      .trim();
 
   const emailFolderPath =
-    document.getElementById('emailFolderPath').value.trim();
+    document
+      .getElementById('emailFolderPath')
+      .value
+      .trim();
 
   const internalDomain =
-    document.getElementById('internalDomain').value.trim();
+    document
+      .getElementById('internalDomain')
+      .value
+      .trim();
 
   if (!vaultName) {
-    showStatus('Please enter a vault name.', 'error');
+    showStatus(
+      'Please enter a vault name.',
+      'error'
+    );
     return;
   }
 
   if (!folderPath) {
-    showStatus('Please enter a meeting notes folder.', 'error');
+    showStatus(
+      'Please enter a meeting notes folder.',
+      'error'
+    );
     return;
   }
 
   if (!emailFolderPath) {
-    showStatus('Please enter an email notes folder.', 'error');
+    showStatus(
+      'Please enter an email notes folder.',
+      'error'
+    );
     return;
   }
 
-  settings.vaultName       = vaultName;
-  settings.folderPath      = folderPath;
-  settings.emailFolderPath = emailFolderPath;
-  settings.internalDomain  =
-    internalDomain || DEFAULT_SETTINGS.internalDomain;
+  settings.vaultName =
+    vaultName;
+
+  settings.folderPath =
+    folderPath;
+
+  settings.emailFolderPath =
+    emailFolderPath;
+
+  settings.internalDomain =
+    internalDomain ||
+    DEFAULT_SETTINGS.internalDomain;
 
   settings.copyToClipboard =
-    document.getElementById('copyToClipboard').checked;
+    document
+      .getElementById('copyToClipboard')
+      .checked;
 
   settings.includeExternal =
-    document.getElementById('includeExternal').checked;
+    document
+      .getElementById('includeExternal')
+      .checked;
 
   try {
-    const rs = Office.context.roamingSettings;
+    const rs =
+      Office.context.roamingSettings;
 
-    for (const [key, value] of Object.entries(settings)) {
-      rs.set(key, value);
+    for (
+      const [key, value]
+      of Object.entries(settings)
+    ) {
+      rs.set(
+        key,
+        value
+      );
     }
 
     rs.saveAsync(result => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) {
+      if (
+        result.status ===
+        Office.AsyncResultStatus.Succeeded
+      ) {
         updateConfigDisplay();
         showPanel('main');
-        showStatus('Settings saved.', 'success');
+
+        showStatus(
+          'Settings saved.',
+          'success'
+        );
       } else {
         showStatus(
           'Could not save settings: ' +
-            (result.error?.message || 'unknown error'),
+            (
+              result.error?.message ||
+              'unknown error'
+            ),
           'error'
         );
       }
     });
   } catch (e) {
-    showStatus('Error saving settings: ' + e.message, 'error');
+    showStatus(
+      'Error saving settings: ' +
+        e.message,
+      'error'
+    );
   }
 }
 
 
 function populateSettingsForm() {
-  document.getElementById('vaultName').value =
-    settings.vaultName;
+  document
+    .getElementById('vaultName')
+    .value =
+      settings.vaultName;
 
-  document.getElementById('folderPath').value =
-    settings.folderPath;
+  document
+    .getElementById('folderPath')
+    .value =
+      settings.folderPath;
 
-  document.getElementById('emailFolderPath').value =
-    settings.emailFolderPath;
+  document
+    .getElementById('emailFolderPath')
+    .value =
+      settings.emailFolderPath;
 
-  document.getElementById('internalDomain').value =
-    settings.internalDomain;
+  document
+    .getElementById('internalDomain')
+    .value =
+      settings.internalDomain;
 
-  document.getElementById('copyToClipboard').checked =
-    settings.copyToClipboard;
+  document
+    .getElementById('copyToClipboard')
+    .checked =
+      settings.copyToClipboard;
 
-  document.getElementById('includeExternal').checked =
-    settings.includeExternal;
+  document
+    .getElementById('includeExternal')
+    .checked =
+      settings.includeExternal;
 }
 
 
 function updateConfigDisplay() {
-  const isMessage = getCurrentItemType() === 'message';
+  const isMessage =
+    getCurrentItemType() === 'message';
 
-  const activePath = isMessage
-    ? settings.emailFolderPath
-    : settings.folderPath;
+  const activePath =
+    isMessage
+      ? settings.emailFolderPath
+      : settings.folderPath;
 
-  const ok = !!(settings.vaultName && activePath);
+  const ok =
+    !!(
+      settings.vaultName &&
+      activePath
+    );
 
-  document.getElementById('configWarning').style.display =
-    ok ? 'none' : 'block';
+  document
+    .getElementById('configWarning')
+    .style.display =
+      ok ? 'none' : 'block';
 
-  document.getElementById('vaultDisplay').textContent =
-    settings.vaultName || 'Not set';
+  document
+    .getElementById('vaultDisplay')
+    .textContent =
+      settings.vaultName ||
+      'Not set';
 
-  document.getElementById('pathDisplay').textContent =
-    activePath || 'Not set';
+  document
+    .getElementById('pathDisplay')
+    .textContent =
+      activePath ||
+      'Not set';
 
-  document.getElementById('extractBtn').disabled = !ok;
+  document
+    .getElementById('extractBtn')
+    .disabled =
+      !ok;
 }
 
 
 function updateFolderPreview() {
   const vault =
-    document.getElementById('vaultName').value || 'YourVault';
+    document
+      .getElementById('vaultName')
+      .value ||
+    'YourVault';
 
   const folder =
-    document.getElementById('folderPath').value || 'Meeting Notes';
+    document
+      .getElementById('folderPath')
+      .value ||
+    'Meeting Notes';
 
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const now =
+    new Date();
 
-  document.getElementById('folderPreview').textContent =
-    `📁 ${vault}/\n` +
-    `  📁 ${folder}/\n` +
-    `    📁 ${y}/\n` +
-    `      📁 ${m}/\n` +
-    `        📄 ${y}-${m}-15 Example Meeting.md`;
+  const y =
+    now.getFullYear();
+
+  const m =
+    String(
+      now.getMonth() + 1
+    ).padStart(
+      2,
+      '0'
+    );
+
+  document
+    .getElementById('folderPreview')
+    .textContent =
+      `📁 ${vault}/\n` +
+      `  📁 ${folder}/\n` +
+      `    📁 ${y}/\n` +
+      `      📁 ${m}/\n` +
+      `        📄 ${y}-${m}-15 Example Meeting.md`;
 }
 
 
@@ -305,17 +496,14 @@ function updateFolderPreview() {
    TEMPLATE SYSTEM
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * Loads a Markdown template from ./templates/.
- *
- * GitHub Pages example:
- *   /outlook-to-obsidian/templates/event-template.md
- *   /outlook-to-obsidian/templates/mail-template.md
- */
 async function loadNoteTemplate(filename) {
-  const response = await fetch(`./templates/${filename}`, {
-    cache: 'no-store',
-  });
+  const response =
+    await fetch(
+      `./templates/${filename}`,
+      {
+        cache: 'no-store',
+      }
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -330,16 +518,29 @@ async function loadNoteTemplate(filename) {
 
 /**
  * Replaces {{variable_name}} placeholders.
- *
- * Unknown variables are replaced with an empty string and logged so that
- * a typo in the Markdown template does not appear in the final note.
  */
-function renderNoteTemplate(template, values) {
+function renderNoteTemplate(
+  template,
+  values
+) {
   return template.replace(
     /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
-    (_match, key) => {
-      if (!Object.prototype.hasOwnProperty.call(values, key)) {
-        console.warn(`Unknown template variable: ${key}`);
+    (
+      _match,
+      key
+    ) => {
+      if (
+        !Object.prototype
+          .hasOwnProperty
+          .call(
+            values,
+            key
+          )
+      ) {
+        console.warn(
+          `Unknown template variable: ${key}`
+        );
+
         return '';
       }
 
@@ -350,36 +551,52 @@ function renderNoteTemplate(template, values) {
 
 
 /**
- * Quote a scalar safely for normal YAML frontmatter.
+ * Quote a scalar safely for YAML frontmatter.
  */
 function yamlQuote(value) {
   return `"${String(value ?? '')
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\r?\n/g, '\\n')}"`;
+    .replace(
+      /\\/g,
+      '\\\\'
+    )
+    .replace(
+      /"/g,
+      '\\"'
+    )
+    .replace(
+      /\r?\n/g,
+      '\\n'
+    )}"`;
 }
 
 
 /**
  * Format an array as a YAML list property.
- *
- * Example:
- * attendees:
- *   - "Anna Andersson"
- *   - "Erik Eriksson"
  */
-function yamlListProperty(propertyName, values) {
-  const unique = Array.from(
-    new Set((values || []).filter(Boolean))
-  );
+function yamlListProperty(
+  propertyName,
+  values
+) {
+  const unique =
+    Array.from(
+      new Set(
+        (values || [])
+          .filter(Boolean)
+      )
+    );
 
-  if (unique.length === 0) {
+  if (
+    unique.length === 0
+  ) {
     return `${propertyName}: []`;
   }
 
   return [
     `${propertyName}:`,
-    ...unique.map(value => `  - ${yamlQuote(value)}`),
+    ...unique.map(
+      value =>
+        `  - ${yamlQuote(value)}`
+    ),
   ].join('\n');
 }
 
@@ -389,14 +606,25 @@ function yamlListProperty(propertyName, values) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 async function onExtract() {
-  const btn = document.getElementById('extractBtn');
+  const btn =
+    document
+      .getElementById('extractBtn');
 
   btn.disabled = true;
 
-  document.getElementById('details').style.display = 'none';
-  document.getElementById('actions').style.display = 'none';
+  document
+    .getElementById('details')
+    .style.display =
+      'none';
 
-  const isMessage = getCurrentItemType() === 'message';
+  document
+    .getElementById('actions')
+    .style.display =
+      'none';
+
+  const isMessage =
+    getCurrentItemType() ===
+    'message';
 
   showStatus(
     isMessage
@@ -406,29 +634,29 @@ async function onExtract() {
   );
 
   try {
-    extractedData = isMessage
-      ? await extractEmailDetails()
-      : await extractMeetingDetails();
+    extractedData =
+      isMessage
+        ? await extractEmailDetails()
+        : await extractMeetingDetails();
 
-    // Apply [EXTERNAL] prefix when configured.
-    //
-    // The note H1 is updated after rendering. The generated filename also uses
-    // extractedData.title later in buildObsidianUri(), so it receives the same
-    // prefix automatically.
     if (
       settings.includeExternal &&
       extractedData.hasExternalAttendees
     ) {
       extractedData.title =
-        '[EXTERNAL] ' + extractedData.title;
+        '[EXTERNAL] ' +
+        extractedData.title;
 
-      extractedData.note = extractedData.note.replace(
-        /^(# ).+$/m,
-        `$1${extractedData.title}`
-      );
+      extractedData.note =
+        extractedData.note.replace(
+          /^(# ).+$/m,
+          `$1${extractedData.title}`
+        );
     }
 
-    renderDetails(extractedData);
+    renderDetails(
+      extractedData
+    );
 
     showStatus(
       isMessage
@@ -437,20 +665,42 @@ async function onExtract() {
       'success'
     );
 
-    if (settings.copyToClipboard) {
-      await copyText(extractedData.note);
+    if (
+      settings.copyToClipboard
+    ) {
+      await copyText(
+        extractedData.note
+      );
     }
 
-    document.getElementById('details').style.display = 'block';
-    document.getElementById('actions').style.display = 'flex';
-  } catch (err) {
-    showStatus('Error: ' + err.message, 'error');
-  } finally {
-    const activePath = isMessage
-      ? settings.emailFolderPath
-      : settings.folderPath;
+    document
+      .getElementById('details')
+      .style.display =
+        'block';
 
-    btn.disabled = !(settings.vaultName && activePath);
+    document
+      .getElementById('actions')
+      .style.display =
+        'flex';
+
+  } catch (err) {
+    showStatus(
+      'Error: ' +
+        err.message,
+      'error'
+    );
+
+  } finally {
+    const activePath =
+      isMessage
+        ? settings.emailFolderPath
+        : settings.folderPath;
+
+    btn.disabled =
+      !(
+        settings.vaultName &&
+        activePath
+      );
   }
 }
 
@@ -460,15 +710,28 @@ async function onExtract() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function renderDetails(data) {
-  const truncate = (value, maxLength) => {
-    const s = String(value || '');
+  const truncate =
+    (
+      value,
+      maxLength
+    ) => {
+      const s =
+        String(
+          value || ''
+        );
 
-    return s.length > maxLength
-      ? s.substring(0, maxLength) + '…'
-      : s;
-  };
+      return s.length >
+        maxLength
+        ? s.substring(
+            0,
+            maxLength
+          ) + '…'
+        : s;
+    };
 
-  const isEmail = data.kind === 'email';
+  const isEmail =
+    data.kind === 'email';
+
   const rows = [];
 
   rows.push(`
@@ -494,7 +757,10 @@ function renderDetails(data) {
     </div>
   `);
 
-  if (!isEmail && data.location) {
+  if (
+    !isEmail &&
+    data.location
+  ) {
     rows.push(`
       <div class="detail-row">
         <span class="detail-label">Location</span>
@@ -510,7 +776,9 @@ function renderDetails(data) {
     </div>
   `);
 
-  if (data.hasExternalAttendees) {
+  if (
+    data.hasExternalAttendees
+  ) {
     rows.push(`
       <div class="detail-row">
         <span class="detail-label">External</span>
@@ -519,8 +787,10 @@ function renderDetails(data) {
     `);
   }
 
-  document.getElementById('details').innerHTML =
-    rows.join('');
+  document
+    .getElementById('details')
+    .innerHTML =
+      rows.join('');
 }
 
 
@@ -533,29 +803,41 @@ function onOpenObsidian() {
     return;
   }
 
-  const uri = buildObsidianUri(extractedData);
-  const link = document.getElementById('obsidianLink');
+  const uri =
+    buildObsidianUri(
+      extractedData
+    );
+
+  const link =
+    document
+      .getElementById('obsidianLink');
 
   link.href = uri;
-
-  // Clicking a hidden anchor is reliable across Outlook Desktop/Web.
   link.click();
 }
 
 
 function buildObsidianUri(data) {
-  const basePath = data.kind === 'email'
-    ? settings.emailFolderPath
-    : settings.folderPath;
+  const basePath =
+    data.kind === 'email'
+      ? settings.emailFolderPath
+      : settings.folderPath;
 
   const folder =
-    `${basePath}/${data.meetingDate.year}/${data.meetingDate.month}`;
+    `${basePath}/` +
+    `${data.meetingDate.year}/` +
+    `${data.meetingDate.month}`;
 
   const safeTitle =
-    data.title.replace(/[<>:"/\\|?*]/g, '-');
+    data.title.replace(
+      /[<>:"/\\|?*]/g,
+      '-'
+    );
 
   const file =
-    `${folder}/${data.meetingDate.full} ${safeTitle}`;
+    `${folder}/` +
+    `${data.meetingDate.full} ` +
+    `${safeTitle}`;
 
   return (
     `obsidian://new` +
@@ -575,30 +857,48 @@ async function onCopy() {
     return;
   }
 
-  await copyText(extractedData.note);
-  showStatus('Note copied to clipboard.', 'success');
+  await copyText(
+    extractedData.note
+  );
+
+  showStatus(
+    'Note copied to clipboard.',
+    'success'
+  );
 }
 
 
 async function copyText(text) {
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard
+      .writeText(text);
+
   } catch (_) {
-    // Fallback for older WebView2 builds.
-    const ta = document.createElement('textarea');
+    const ta =
+      document
+        .createElement('textarea');
 
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity  = '0';
+    ta.value =
+      text;
 
-    document.body.appendChild(ta);
+    ta.style.position =
+      'fixed';
+
+    ta.style.opacity =
+      '0';
+
+    document.body
+      .appendChild(ta);
 
     ta.focus();
     ta.select();
 
-    document.execCommand('copy');
+    document.execCommand(
+      'copy'
+    );
 
-    document.body.removeChild(ta);
+    document.body
+      .removeChild(ta);
   }
 }
 
@@ -607,20 +907,41 @@ async function copyText(text) {
    UI HELPERS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function showStatus(message, type) {
-  const el = document.getElementById('status');
+function showStatus(
+  message,
+  type
+) {
+  const el =
+    document
+      .getElementById('status');
 
-  el.textContent = message;
-  el.className = `status ${type}`;
-  el.style.display = 'block';
+  el.textContent =
+    message;
+
+  el.className =
+    `status ${type}`;
+
+  el.style.display =
+    'block';
 }
 
 
 function esc(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return String(
+    value || ''
+  )
+    .replace(
+      /&/g,
+      '&amp;'
+    )
+    .replace(
+      /</g,
+      '&lt;'
+    )
+    .replace(
+      />/g,
+      '&gt;'
+    );
 }
 
 
@@ -629,26 +950,35 @@ function esc(value) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 async function extractMeetingDetails() {
-  const item = Office.context.mailbox.item;
+  const item =
+    Office.context.mailbox.item;
 
-  // Read mode has a persisted item ID; compose mode normally does not.
-  const isReadMode = !!item.itemId;
+  const isReadMode =
+    !!item.itemId;
 
 
   /* ── Subject ──────────────────────────────────────────────────────────── */
 
   const title =
-    (await getItemProperty(item.subject)) ||
+    (
+      await getItemProperty(
+        item.subject
+      )
+    ) ||
     'Untitled Meeting';
 
 
   /* ── Start / end ──────────────────────────────────────────────────────── */
 
   const startDate =
-    await getItemProperty(item.start);
+    await getItemProperty(
+      item.start
+    );
 
   const endDate =
-    await getItemProperty(item.end);
+    await getItemProperty(
+      item.end
+    );
 
   let time = '';
   let startTime = '';
@@ -663,49 +993,104 @@ async function extractMeetingDetails() {
       startDate.getFullYear();
 
     const mo =
-      String(startDate.getMonth() + 1).padStart(2, '0');
+      String(
+        startDate.getMonth() + 1
+      ).padStart(
+        2,
+        '0'
+      );
 
     const d =
-      String(startDate.getDate()).padStart(2, '0');
+      String(
+        startDate.getDate()
+      ).padStart(
+        2,
+        '0'
+      );
 
     meetingDate = {
-      year: String(y),
-      month: mo,
-      day: d,
-      full: `${y}-${mo}-${d}`,
+      year:
+        String(y),
+
+      month:
+        mo,
+
+      day:
+        d,
+
+      full:
+        `${y}-${mo}-${d}`,
     };
 
     const timeFormat = {
-      hour: '2-digit',
-      minute: '2-digit',
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
     };
 
     startTime =
-      startDate.toLocaleTimeString([], timeFormat);
+      startDate
+        .toLocaleTimeString(
+          [],
+          timeFormat
+        );
 
     endTime =
-      endDate instanceof Date && !isNaN(endDate)
-        ? endDate.toLocaleTimeString([], timeFormat)
+      endDate instanceof Date &&
+      !isNaN(endDate)
+        ? endDate
+            .toLocaleTimeString(
+              [],
+              timeFormat
+            )
         : '';
 
     time =
       `${startDate.toLocaleDateString()} ${startTime}` +
-      (endTime ? ` – ${endTime}` : '');
+      (
+        endTime
+          ? ` – ${endTime}`
+          : ''
+      );
   }
 
   if (!meetingDate) {
-    const today = new Date();
+    const today =
+      new Date();
+
+    const y =
+      today.getFullYear();
+
+    const mo =
+      String(
+        today.getMonth() + 1
+      ).padStart(
+        2,
+        '0'
+      );
+
+    const d =
+      String(
+        today.getDate()
+      ).padStart(
+        2,
+        '0'
+      );
 
     meetingDate = {
-      year: String(today.getFullYear()),
+      year:
+        String(y),
+
       month:
-        String(today.getMonth() + 1).padStart(2, '0'),
+        mo,
+
       day:
-        String(today.getDate()).padStart(2, '0'),
+        d,
+
       full:
-        `${today.getFullYear()}-` +
-        `${String(today.getMonth() + 1).padStart(2, '0')}-` +
-        `${String(today.getDate()).padStart(2, '0')}`,
+        `${y}-${mo}-${d}`,
     };
   }
 
@@ -713,45 +1098,161 @@ async function extractMeetingDetails() {
   /* ── Location ─────────────────────────────────────────────────────────── */
 
   const location =
-    (await getItemProperty(item.location)) || '';
+    (
+      await getItemProperty(
+        item.location
+      )
+    ) ||
+    '';
+
+
+  /* ── Current Outlook user ─────────────────────────────────────────────── */
+
+  const currentUserName =
+    (
+      Office.context
+        .mailbox
+        .userProfile
+        ?.displayName ||
+      ''
+    )
+      .trim();
+
+  const currentUserEmail =
+    (
+      Office.context
+        .mailbox
+        .userProfile
+        ?.emailAddress ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
 
 
   /* ── Organizer ────────────────────────────────────────────────────────── */
 
   let organizer = '';
   let organizerEmail = '';
+  let organizerIsSelf = false;
 
-  if (isReadMode && item.organizer) {
+  if (
+    isReadMode &&
+    item.organizer
+  ) {
     organizer =
-      item.organizer.displayName || '';
+      (
+        item.organizer
+          .displayName ||
+        ''
+      )
+        .trim();
 
     organizerEmail =
-      (item.organizer.emailAddress || '')
+      (
+        item.organizer
+          .emailAddress ||
+        ''
+      )
+        .trim()
         .toLowerCase();
+
+    organizerIsSelf =
+      !!(
+        currentUserEmail &&
+        organizerEmail &&
+        currentUserEmail ===
+          organizerEmail
+      );
   }
+
+
+  /*
+   * Compose mode normally does not expose item.organizer.
+   * The mailbox user creating the appointment is therefore used
+   * as the organizer fallback.
+   */
+  if (
+    !isReadMode &&
+    currentUserEmail
+  ) {
+    organizer =
+      currentUserName ||
+      currentUserEmail;
+
+    organizerEmail =
+      currentUserEmail;
+
+    organizerIsSelf =
+      true;
+  }
+
+
+  /*
+   * If Outlook identifies the email as self but for some reason
+   * does not return a display name, use the mailbox profile name.
+   */
+  if (
+    organizerIsSelf &&
+    !organizer
+  ) {
+    organizer =
+      currentUserName ||
+      currentUserEmail;
+  }
+
+
+  /*
+   * Presentation value for the note.
+   *
+   * Example:
+   *   Jonatan Hellborg (self)
+   */
+  const organizerDisplay =
+    organizerIsSelf
+      ? (
+          `${organizer || currentUserName || currentUserEmail} (self)`
+        )
+      : organizer;
 
 
   /* ── Body / description ───────────────────────────────────────────────── */
 
   const body =
-    await getBodyMarkdown(item);
+    await getBodyMarkdown(
+      item
+    );
 
 
   /* ── Attendees with RSVP ──────────────────────────────────────────────── */
 
   let attendeesByStatus = {
-    'Accepted':    new Map(),
-    'Tentative':   new Map(),
-    'Declined':    new Map(),
-    'No Response': new Map(),
+    'Accepted':
+      new Map(),
+
+    'Tentative':
+      new Map(),
+
+    'Declined':
+      new Map(),
+
+    'No Response':
+      new Map(),
   };
 
-  let ewsErrorMessage = '';
+  let ewsErrorMessage =
+    '';
 
-  if (isReadMode && item.itemId) {
+  if (
+    isReadMode &&
+    item.itemId
+  ) {
     try {
       attendeesByStatus =
-        await getAttendeesViaEws(item.itemId);
+        await getAttendeesViaEws(
+          item.itemId
+        );
+
     } catch (ewsErr) {
       console.warn(
         'EWS attendee fetch failed, using Office.js fallback:',
@@ -759,14 +1260,20 @@ async function extractMeetingDetails() {
       );
 
       ewsErrorMessage =
-        ewsErr.message || 'unknown';
+        ewsErr.message ||
+        'unknown';
 
       attendeesByStatus =
-        await getAttendeesViaOfficeJs(item);
+        await getAttendeesViaOfficeJs(
+          item
+        );
     }
+
   } else {
     attendeesByStatus =
-      await getAttendeesViaOfficeJs(item);
+      await getAttendeesViaOfficeJs(
+        item
+      );
   }
 
 
@@ -779,29 +1286,48 @@ async function extractMeetingDetails() {
       DEFAULT_SETTINGS.internalDomain
     )
       .toLowerCase()
-      .replace(/^@/, '');
+      .replace(
+        /^@/,
+        ''
+      );
 
   let hasExternalAttendees =
     organizerEmail
-      ? !organizerEmail.endsWith(internalSuffix)
+      ? !organizerEmail
+          .endsWith(
+            internalSuffix
+          )
       : false;
 
-  if (!hasExternalAttendees) {
+  if (
+    !hasExternalAttendees
+  ) {
     for (
       const attendees
-      of Object.values(attendeesByStatus)
+      of Object.values(
+        attendeesByStatus
+      )
     ) {
-      for (const email of attendees.values()) {
+      for (
+        const email
+        of attendees.values()
+      ) {
         if (
           email &&
-          !email.endsWith(internalSuffix)
+          !email.endsWith(
+            internalSuffix
+          )
         ) {
-          hasExternalAttendees = true;
+          hasExternalAttendees =
+            true;
+
           break;
         }
       }
 
-      if (hasExternalAttendees) {
+      if (
+        hasExternalAttendees
+      ) {
         break;
       }
     }
@@ -810,43 +1336,73 @@ async function extractMeetingDetails() {
 
   /* ── Format attendee information ──────────────────────────────────────── */
 
-  const attendeesFormatted = [];
-  const allAttendeeNames = [];
+  const attendeesFormatted =
+    [];
+
+  const allAttendeeNames =
+    [];
 
   let totalAttendees =
-    organizer ? 1 : 0;
+    organizer
+      ? 1
+      : 0;
 
-  if (organizer) {
+  if (
+    organizerDisplay
+  ) {
     attendeesFormatted.push(
-      `**Organizer:** ${organizer}`
+      `**Organizer:** ${organizerDisplay}`
     );
 
-    allAttendeeNames.push(organizer);
+    /*
+     * Keep the actual person's name in the YAML attendee list,
+     * without "(self)" as that is presentation metadata rather
+     * than part of the person's name.
+     */
+    allAttendeeNames.push(
+      organizer ||
+      currentUserName ||
+      currentUserEmail
+    );
   }
 
   for (
     const status
-    of ['Accepted', 'Tentative', 'No Response', 'Declined']
+    of [
+      'Accepted',
+      'Tentative',
+      'No Response',
+      'Declined',
+    ]
   ) {
     const list =
       Array.from(
-        attendeesByStatus[status].keys()
-      ).sort();
+        attendeesByStatus[
+          status
+        ].keys()
+      )
+        .sort();
 
-    if (list.length > 0) {
-      totalAttendees += list.length;
+    if (
+      list.length > 0
+    ) {
+      totalAttendees +=
+        list.length;
 
       attendeesFormatted.push(
         `**${status} (${list.length}):** ` +
         list.join(', ')
       );
 
-      allAttendeeNames.push(...list);
+      allAttendeeNames.push(
+        ...list
+      );
     }
   }
 
   const attendeesStr =
-    attendeesFormatted.join('\n\n') ||
+    attendeesFormatted
+      .join('\n\n') ||
     'No attendees found';
 
   const attendeesFrontmatter =
@@ -859,96 +1415,220 @@ async function extractMeetingDetails() {
   /* ── Render event-template.md ─────────────────────────────────────────── */
 
   const template =
-    await loadNoteTemplate('event-template.md');
+    await loadNoteTemplate(
+      'event-template.md'
+    );
 
   const note =
-    renderNoteTemplate(template, {
-      // General
-      title,
+    renderNoteTemplate(
+      template,
+      {
+        // General
+        title,
 
-      // Date
-      date: meetingDate.full,
-      year: meetingDate.year,
-      month: meetingDate.month,
-      day: meetingDate.day,
+        // Date
+        date:
+          meetingDate.full,
 
-      // Time
-      time: time || 'Not specified',
-      start_time: startTime,
-      end_time: endTime,
-      start_time_yaml: yamlQuote(startTime),
-      end_time_yaml: yamlQuote(endTime),
+        year:
+          meetingDate.year,
 
-      // Location
-      location,
-      location_yaml: yamlQuote(location),
+        month:
+          meetingDate.month,
 
-      // Organizer
-      organizer,
-      organizer_email: organizerEmail,
-      organizer_yaml: yamlQuote(organizer),
-      organizer_email_yaml: yamlQuote(organizerEmail),
+        day:
+          meetingDate.day,
 
-      // Attendees
-      attendees: attendeesStr,
-      attendees_frontmatter: attendeesFrontmatter,
-      attendee_count: String(totalAttendees),
+        // Time
+        time:
+          time ||
+          'Not specified',
 
-      // RSVP lists
-      accepted_attendees:
-        Array.from(
-          attendeesByStatus['Accepted'].keys()
-        ).sort().join(', '),
+        start_time:
+          startTime,
 
-      tentative_attendees:
-        Array.from(
-          attendeesByStatus['Tentative'].keys()
-        ).sort().join(', '),
+        end_time:
+          endTime,
 
-      no_response_attendees:
-        Array.from(
-          attendeesByStatus['No Response'].keys()
-        ).sort().join(', '),
+        start_time_yaml:
+          yamlQuote(
+            startTime
+          ),
 
-      declined_attendees:
-        Array.from(
-          attendeesByStatus['Declined'].keys()
-        ).sort().join(', '),
+        end_time_yaml:
+          yamlQuote(
+            endTime
+          ),
 
-      // Meeting classification
-      external:
-        String(hasExternalAttendees),
+        // Location
+        location,
 
-      external_line:
-        hasExternalAttendees
-          ? '**External Meeting:** Yes'
-          : '',
+        location_yaml:
+          yamlQuote(
+            location
+          ),
 
-      // Outlook meeting description / agenda
-      body:
-        body.trim() || '',
-    });
+        // Organizer
+        organizer:
+          organizerDisplay,
+
+        organizer_name:
+          organizer,
+
+        organizer_email:
+          organizerEmail,
+
+        organizer_is_self:
+          String(
+            organizerIsSelf
+          ),
+
+        organizer_yaml:
+          yamlQuote(
+            organizerDisplay
+          ),
+
+        organizer_name_yaml:
+          yamlQuote(
+            organizer
+          ),
+
+        organizer_email_yaml:
+          yamlQuote(
+            organizerEmail
+          ),
+
+        // Current user
+        current_user_name:
+          currentUserName,
+
+        current_user_email:
+          currentUserEmail,
+
+        current_user_name_yaml:
+          yamlQuote(
+            currentUserName
+          ),
+
+        current_user_email_yaml:
+          yamlQuote(
+            currentUserEmail
+          ),
+
+        // Attendees
+        attendees:
+          attendeesStr,
+
+        attendees_frontmatter:
+          attendeesFrontmatter,
+
+        attendee_count:
+          String(
+            totalAttendees
+          ),
+
+        // RSVP lists
+        accepted_attendees:
+          Array.from(
+            attendeesByStatus[
+              'Accepted'
+            ].keys()
+          )
+            .sort()
+            .join(', '),
+
+        tentative_attendees:
+          Array.from(
+            attendeesByStatus[
+              'Tentative'
+            ].keys()
+          )
+            .sort()
+            .join(', '),
+
+        no_response_attendees:
+          Array.from(
+            attendeesByStatus[
+              'No Response'
+            ].keys()
+          )
+            .sort()
+            .join(', '),
+
+        declined_attendees:
+          Array.from(
+            attendeesByStatus[
+              'Declined'
+            ].keys()
+          )
+            .sort()
+            .join(', '),
+
+        // Meeting classification
+        external:
+          String(
+            hasExternalAttendees
+          ),
+
+        external_line:
+          hasExternalAttendees
+            ? '**External Meeting:** Yes'
+            : '',
+
+        // Outlook meeting description / agenda
+        body:
+          body.trim() ||
+          '',
+      }
+    );
 
 
   /* ── Return extracted meeting data ────────────────────────────────────── */
 
   const safeTitle =
-    title.replace(/[<>:"/\\|?*]/g, '-');
+    title.replace(
+      /[<>:"/\\|?*]/g,
+      '-'
+    );
 
   return {
-    kind: 'meeting',
+    kind:
+      'meeting',
+
     title,
+
     time,
+
     startTime,
+
     endTime,
+
     location,
-    organizer,
+
+    organizer:
+      organizerDisplay,
+
+    organizerName:
+      organizer,
+
     organizerEmail,
+
+    organizerIsSelf,
+
+    currentUserName,
+
+    currentUserEmail,
+
     totalAttendees,
+
     hasExternalAttendees,
+
     meetingDate,
+
     safeTitle,
+
     note,
+
     ewsErrorMessage,
   };
 }
@@ -966,19 +1646,29 @@ async function extractEmailDetails() {
   /* ── Subject ──────────────────────────────────────────────────────────── */
 
   const title =
-    (await getItemProperty(item.subject)) ||
+    (
+      await getItemProperty(
+        item.subject
+      )
+    ) ||
     'No Subject';
 
 
   /* ── Sent date ────────────────────────────────────────────────────────── */
 
   const sentDate =
-    item.dateTimeCreated instanceof Date &&
-    !isNaN(item.dateTimeCreated)
+    item.dateTimeCreated
+      instanceof Date &&
+    !isNaN(
+      item.dateTimeCreated
+    )
       ? item.dateTimeCreated
       : (
-          item.dateTimeModified instanceof Date &&
-          !isNaN(item.dateTimeModified)
+          item.dateTimeModified
+            instanceof Date &&
+          !isNaN(
+            item.dateTimeModified
+          )
             ? item.dateTimeModified
             : new Date()
         );
@@ -987,25 +1677,47 @@ async function extractEmailDetails() {
     sentDate.getFullYear();
 
   const mo =
-    String(sentDate.getMonth() + 1)
-      .padStart(2, '0');
+    String(
+      sentDate.getMonth() + 1
+    ).padStart(
+      2,
+      '0'
+    );
 
   const d =
-    String(sentDate.getDate())
-      .padStart(2, '0');
+    String(
+      sentDate.getDate()
+    ).padStart(
+      2,
+      '0'
+    );
 
   const meetingDate = {
-    year: String(y),
-    month: mo,
-    day: d,
-    full: `${y}-${mo}-${d}`,
+    year:
+      String(y),
+
+    month:
+      mo,
+
+    day:
+      d,
+
+    full:
+      `${y}-${mo}-${d}`,
   };
 
   const sentTime =
-    sentDate.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    sentDate
+      .toLocaleTimeString(
+        [],
+        {
+          hour:
+            '2-digit',
+
+          minute:
+            '2-digit',
+        }
+      );
 
   const time =
     `${sentDate.toLocaleDateString()} ${sentTime}`;
@@ -1014,7 +1726,9 @@ async function extractEmailDetails() {
   /* ── From / sender ────────────────────────────────────────────────────── */
 
   const fromObj =
-    item.from || item.sender || {};
+    item.from ||
+    item.sender ||
+    {};
 
   const fromName =
     fromObj.displayName ||
@@ -1022,30 +1736,41 @@ async function extractEmailDetails() {
     '';
 
   const fromEmail =
-    (fromObj.emailAddress || '')
+    (
+      fromObj.emailAddress ||
+      ''
+    )
       .toLowerCase();
 
 
   /* ── To / Cc ──────────────────────────────────────────────────────────── */
 
   const toList =
-    Array.isArray(item.to)
+    Array.isArray(
+      item.to
+    )
       ? item.to
       : [];
 
   const ccList =
-    Array.isArray(item.cc)
+    Array.isArray(
+      item.cc
+    )
       ? item.cc
       : [];
 
-  function formatPerson(person) {
+
+  function formatPerson(
+    person
+  ) {
     const name =
       person.displayName ||
       person.emailAddress ||
       '';
 
     const email =
-      person.emailAddress || '';
+      person.emailAddress ||
+      '';
 
     return (
       email &&
@@ -1055,17 +1780,32 @@ async function extractEmailDetails() {
     );
   }
 
+
   const toFormatted =
-    toList.map(formatPerson).filter(Boolean);
+    toList
+      .map(
+        formatPerson
+      )
+      .filter(
+        Boolean
+      );
 
   const ccFormatted =
-    ccList.map(formatPerson).filter(Boolean);
+    ccList
+      .map(
+        formatPerson
+      )
+      .filter(
+        Boolean
+      );
 
 
   /* ── Body ─────────────────────────────────────────────────────────────── */
 
   const body =
-    await getBodyMarkdown(item);
+    await getBodyMarkdown(
+      item
+    );
 
 
   /* ── External detection ───────────────────────────────────────────────── */
@@ -1077,35 +1817,53 @@ async function extractEmailDetails() {
       DEFAULT_SETTINGS.internalDomain
     )
       .toLowerCase()
-      .replace(/^@/, '');
+      .replace(
+        /^@/,
+        ''
+      );
 
   let hasExternalAttendees =
     !!(
       fromEmail &&
-      !fromEmail.endsWith(internalSuffix)
+      !fromEmail.endsWith(
+        internalSuffix
+      )
     );
 
-  if (!hasExternalAttendees) {
+  if (
+    !hasExternalAttendees
+  ) {
     for (
       const person
-      of [...toList, ...ccList]
+      of [
+        ...toList,
+        ...ccList,
+      ]
     ) {
       const email =
-        (person.emailAddress || '')
+        (
+          person.emailAddress ||
+          ''
+        )
           .toLowerCase();
 
       if (
         email &&
-        !email.endsWith(internalSuffix)
+        !email.endsWith(
+          internalSuffix
+        )
       ) {
-        hasExternalAttendees = true;
+        hasExternalAttendees =
+          true;
+
         break;
       }
     }
   }
 
   const totalAttendees =
-    toList.length + ccList.length;
+    toList.length +
+    ccList.length;
 
 
   /* ── Sender display value ─────────────────────────────────────────────── */
@@ -1114,7 +1872,8 @@ async function extractEmailDetails() {
     fromName
       ? (
           fromEmail &&
-          fromName !== fromEmail
+          fromName !==
+            fromEmail
             ? `${fromName} <${fromEmail}>`
             : fromName
         )
@@ -1124,85 +1883,144 @@ async function extractEmailDetails() {
   /* ── Render mail-template.md ──────────────────────────────────────────── */
 
   const template =
-    await loadNoteTemplate('mail-template.md');
+    await loadNoteTemplate(
+      'mail-template.md'
+    );
 
   const note =
-    renderNoteTemplate(template, {
-      // General
-      title,
+    renderNoteTemplate(
+      template,
+      {
+        title,
 
-      // Date/time
-      date: meetingDate.full,
-      year: meetingDate.year,
-      month: meetingDate.month,
-      day: meetingDate.day,
-      time,
-      sent_time: sentTime,
+        date:
+          meetingDate.full,
 
-      // Sender
-      from: fromLine,
-      from_name: fromName,
-      from_email: fromEmail,
-      from_yaml: yamlQuote(fromLine),
-      from_name_yaml: yamlQuote(fromName),
-      from_email_yaml: yamlQuote(fromEmail),
+        year:
+          meetingDate.year,
 
-      // Recipients
-      to: toFormatted.join(', '),
-      cc: ccFormatted.join(', '),
+        month:
+          meetingDate.month,
 
-      to_line:
-        toFormatted.length
-          ? `**To (${toFormatted.length}):** ` +
-            toFormatted.join(', ')
-          : '',
+        day:
+          meetingDate.day,
 
-      cc_line:
-        ccFormatted.length
-          ? `**Cc (${ccFormatted.length}):** ` +
-            ccFormatted.join(', ')
-          : '',
+        time,
 
-      to_frontmatter:
-        yamlListProperty('to', toFormatted),
+        sent_time:
+          sentTime,
 
-      cc_frontmatter:
-        yamlListProperty('cc', ccFormatted),
+        from:
+          fromLine,
 
-      recipient_count:
-        String(totalAttendees),
+        from_name:
+          fromName,
 
-      // Classification
-      external:
-        String(hasExternalAttendees),
+        from_email:
+          fromEmail,
 
-      external_line:
-        hasExternalAttendees
-          ? '**External Email:** Yes'
-          : '',
+        from_yaml:
+          yamlQuote(
+            fromLine
+          ),
 
-      // Body
-      body:
-        body.trim() || '',
-    });
+        from_name_yaml:
+          yamlQuote(
+            fromName
+          ),
 
+        from_email_yaml:
+          yamlQuote(
+            fromEmail
+          ),
 
-  /* ── Return extracted email data ──────────────────────────────────────── */
+        to:
+          toFormatted
+            .join(', '),
+
+        cc:
+          ccFormatted
+            .join(', '),
+
+        to_line:
+          toFormatted.length
+            ? (
+                `**To (${toFormatted.length}):** ` +
+                toFormatted.join(', ')
+              )
+            : '',
+
+        cc_line:
+          ccFormatted.length
+            ? (
+                `**Cc (${ccFormatted.length}):** ` +
+                ccFormatted.join(', ')
+              )
+            : '',
+
+        to_frontmatter:
+          yamlListProperty(
+            'to',
+            toFormatted
+          ),
+
+        cc_frontmatter:
+          yamlListProperty(
+            'cc',
+            ccFormatted
+          ),
+
+        recipient_count:
+          String(
+            totalAttendees
+          ),
+
+        external:
+          String(
+            hasExternalAttendees
+          ),
+
+        external_line:
+          hasExternalAttendees
+            ? '**External Email:** Yes'
+            : '',
+
+        body:
+          body.trim() ||
+          '',
+      }
+    );
 
   const safeTitle =
-    title.replace(/[<>:"/\\|?*]/g, '-');
+    title.replace(
+      /[<>:"/\\|?*]/g,
+      '-'
+    );
 
   return {
-    kind: 'email',
+    kind:
+      'email',
+
     title,
+
     time,
-    fromName: fromLine,
+
+    fromName:
+      fromLine,
+
     fromEmail,
-    location: '',
+
+    location:
+      '',
+
     totalAttendees,
+
     hasExternalAttendees,
+
     meetingDate,
+
     safeTitle,
+
     note,
   };
 }
@@ -1212,204 +2030,304 @@ async function extractEmailDetails() {
    OFFICE.JS HELPERS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * Reads a property that is either a direct value (read mode) or exposes
- * getAsync() (compose mode), and returns a Promise for the resolved value.
- */
-function getItemProperty(propOrValue) {
-  return new Promise(resolve => {
-    if (
-      propOrValue === undefined ||
-      propOrValue === null
-    ) {
-      resolve('');
-      return;
-    }
+function getItemProperty(
+  propOrValue
+) {
+  return new Promise(
+    resolve => {
+      if (
+        propOrValue ===
+          undefined ||
+        propOrValue ===
+          null
+      ) {
+        resolve('');
+        return;
+      }
 
-    // Direct value: string, Date, number, boolean.
-    if (
-      typeof propOrValue !== 'object' ||
-      propOrValue instanceof Date
-    ) {
-      resolve(propOrValue);
-      return;
-    }
-
-    // Compose-mode Office.js wrapper.
-    if (
-      typeof propOrValue.getAsync === 'function'
-    ) {
-      propOrValue.getAsync(result => {
+      if (
+        typeof propOrValue !==
+          'object' ||
+        propOrValue instanceof
+          Date
+      ) {
         resolve(
-          result.status ===
-            Office.AsyncResultStatus.Succeeded
-            ? result.value
-            : ''
+          propOrValue
         );
-      });
-    } else {
-      resolve('');
+
+        return;
+      }
+
+      if (
+        typeof propOrValue
+          .getAsync ===
+        'function'
+      ) {
+        propOrValue
+          .getAsync(
+            result => {
+              resolve(
+                result.status ===
+                  Office.AsyncResultStatus.Succeeded
+                  ? result.value
+                  : ''
+              );
+            }
+          );
+
+      } else {
+        resolve('');
+      }
     }
-  });
+  );
 }
 
 
-/**
- * Get body as plain text.
- */
 function getBodyText(item) {
-  return new Promise(resolve => {
-    if (!item.body) {
-      resolve('');
-      return;
-    }
-
-    item.body.getAsync(
-      Office.CoercionType.Text,
-      result => {
-        resolve(
-          result.status ===
-            Office.AsyncResultStatus.Succeeded
-            ? result.value || ''
-            : ''
-        );
+  return new Promise(
+    resolve => {
+      if (!item.body) {
+        resolve('');
+        return;
       }
-    );
-  });
+
+      item.body.getAsync(
+        Office.CoercionType.Text,
+        result => {
+          resolve(
+            result.status ===
+              Office.AsyncResultStatus.Succeeded
+              ? (
+                  result.value ||
+                  ''
+                )
+              : ''
+          );
+        }
+      );
+    }
+  );
 }
 
 
 /**
  * Get the body as Markdown.
  *
- * Pulls HTML, cleans Outlook-specific markup and converts it using Turndown.
- * Falls back to plain text if Turndown is unavailable or conversion fails.
+ * Pipeline:
+ *
+ * Outlook HTML
+ *   ↓
+ * cleanOutlookHtml()
+ *   ↓
+ * removeTeamsInviteBlockHtml()
+ *   ↓
+ * normalizeOutlookListNesting()
+ *   ↓
+ * Turndown
+ *   ↓
+ * removeTeamsInviteText()
+ *   ↓
+ * compactMarkdown()
  */
 function getBodyMarkdown(item) {
-  return new Promise(resolve => {
-    if (!item.body) {
-      resolve('');
-      return;
-    }
+  return new Promise(
+    resolve => {
+      if (!item.body) {
+        resolve('');
+        return;
+      }
 
-    item.body.getAsync(
-      Office.CoercionType.Html,
-      result => {
-        if (
-          result.status !==
-            Office.AsyncResultStatus.Succeeded ||
-          !result.value
-        ) {
-          getBodyText(item)
-            .then(text => resolve(removeTeamsInviteText(text)));
-          return;
-        }
+      item.body.getAsync(
+        Office.CoercionType.Html,
+        result => {
 
-        const html =
-          flattenTableCellBlocks(
-            promoteOutlookTableHeaders(
-              removeTeamsInviteBlockHtml(
-                cleanOutlookHtml(result.value)
-              )
-            )
-          );
-
-        if (
-          typeof TurndownService === 'undefined'
-        ) {
-          const tmp =
-            document.createElement('div');
-
-          tmp.innerHTML = html;
-
-          resolve(
-            removeTeamsInviteText(tmp.textContent || '')
-          );
-
-          return;
-        }
-
-        try {
-          const td =
-            new TurndownService({
-              headingStyle: 'atx',
-              bulletListMarker: '-',
-              codeBlockStyle: 'fenced',
-              emDelimiter: '*',
-            });
-
-          // GFM plugin: tables, strikethrough, task lists.
           if (
-            typeof turndownPluginGfm !==
-            'undefined'
+            result.status !==
+              Office.AsyncResultStatus.Succeeded ||
+            !result.value
           ) {
-            td.use(turndownPluginGfm.gfm);
+            getBodyText(item)
+              .then(
+                text => {
+                  resolve(
+                    compactMarkdown(
+                      removeTeamsInviteText(
+                        text
+                      )
+                    )
+                  );
+                }
+              );
+
+            return;
           }
 
-          // Inline Outlook cid: images cannot be resolved in Obsidian.
-          td.addRule('strip-cid-images', {
-            filter: node =>
-              node.nodeName === 'IMG' &&
-              (
-                node.getAttribute('src') ||
-                ''
+          const html =
+            flattenTableCellBlocks(
+              promoteOutlookTableHeaders(
+                normalizeOutlookListNesting(
+                  removeTeamsInviteBlockHtml(
+                    cleanOutlookHtml(
+                      result.value
+                    )
+                  )
+                )
               )
-                .toLowerCase()
-                .startsWith('cid:'),
+            );
 
-            replacement: (_content, node) => {
-              const alt =
-                node.getAttribute('alt');
+          if (
+            typeof TurndownService ===
+            'undefined'
+          ) {
+            const tmp =
+              document
+                .createElement(
+                  'div'
+                );
 
-              return alt
-                ? `*[${alt}]*`
-                : '';
-            },
-          });
+            tmp.innerHTML =
+              html;
 
-          const md =
-            td.turndown(html)
-              .replace(/\u00a0/g, ' ')
-              .replace(/\n{3,}/g, '\n\n')
-              .trim();
+            resolve(
+              compactMarkdown(
+                removeTeamsInviteText(
+                  tmp.textContent ||
+                  ''
+                )
+              )
+            );
 
-          resolve(removeTeamsInviteText(md));
-        } catch (e) {
-          console.warn(
-            'Turndown conversion failed, using text fallback:',
-            e.message
-          );
+            return;
+          }
 
-          getBodyText(item)
-            .then(text => resolve(removeTeamsInviteText(text)));
+          try {
+            const td =
+              new TurndownService(
+                {
+                  headingStyle:
+                    'atx',
+
+                  bulletListMarker:
+                    '-',
+
+                  codeBlockStyle:
+                    'fenced',
+
+                  emDelimiter:
+                    '*',
+                }
+              );
+
+            if (
+              typeof turndownPluginGfm !==
+              'undefined'
+            ) {
+              td.use(
+                turndownPluginGfm.gfm
+              );
+            }
+
+            td.addRule(
+              'strip-cid-images',
+              {
+                filter:
+                  node =>
+                    node.nodeName ===
+                      'IMG' &&
+                    (
+                      node.getAttribute(
+                        'src'
+                      ) ||
+                      ''
+                    )
+                      .toLowerCase()
+                      .startsWith(
+                        'cid:'
+                      ),
+
+                replacement:
+                  (
+                    _content,
+                    node
+                  ) => {
+                    const alt =
+                      node.getAttribute(
+                        'alt'
+                      );
+
+                    return alt
+                      ? `*[${alt}]*`
+                      : '';
+                  },
+              }
+            );
+
+            const md =
+              td
+                .turndown(
+                  html
+                )
+                .replace(
+                  /\u00a0/g,
+                  ' '
+                )
+                .replace(
+                  /\n{3,}/g,
+                  '\n\n'
+                )
+                .trim();
+
+            resolve(
+              compactMarkdown(
+                removeTeamsInviteText(
+                  md
+                )
+              )
+            );
+
+          } catch (e) {
+            console.warn(
+              'Turndown conversion failed, using text fallback:',
+              e.message
+            );
+
+            getBodyText(item)
+              .then(
+                text => {
+                  resolve(
+                    compactMarkdown(
+                      removeTeamsInviteText(
+                        text
+                      )
+                    )
+                  );
+                }
+              );
+          }
         }
-      }
-    );
-  });
+      );
+    }
+  );
 }
 
 
-/**
- * Remove the complete Microsoft Teams invitation block from Outlook HTML.
- *
- * Primary strategy:
- *   1. Remove known Teams placeholder containers when Outlook provides them.
- *   2. Otherwise locate the Teams heading and remove the surrounding generated
- *      block up to the closing separator / organizer section.
- *   3. Finally remove any standalone Teams join/help links that remain.
- *
- * The original meeting description / agenda outside the Teams block is kept.
- */
-function removeTeamsInviteBlockHtml(html) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEAMS BLOCK REMOVAL — HTML
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function removeTeamsInviteBlockHtml(
+  html
+) {
   const wrapper =
-    document.createElement('div');
+    document
+      .createElement(
+        'div'
+      );
 
-  wrapper.innerHTML = html || '';
+  wrapper.innerHTML =
+    html ||
+    '';
 
-  /*
-   * Modern Outlook commonly wraps the generated Teams invitation in a
-   * dedicated element. Remove those first when present.
-   */
   const knownTeamsSelectors = [
     '[id*="MicrosoftTeamsMeetingPlaceholder"]',
     '[id*="TeamsMeetingPlaceholder"]',
@@ -1417,115 +2335,176 @@ function removeTeamsInviteBlockHtml(html) {
     '[class*="TeamsMeetingPlaceholder"]',
   ];
 
-  for (const selector of knownTeamsSelectors) {
-    for (const node of wrapper.querySelectorAll(selector)) {
+  for (
+    const selector
+    of knownTeamsSelectors
+  ) {
+    for (
+      const node
+      of wrapper
+        .querySelectorAll(
+          selector
+        )
+    ) {
       node.remove();
     }
   }
 
-  /*
-   * Fallback for Outlook versions/locales where no useful Teams container ID
-   * exists. Find a block whose text is the Teams heading and remove the
-   * generated siblings that follow it.
-   */
   const blockTags =
-    new Set(['DIV', 'P', 'TABLE', 'TR', 'TD', 'LI']);
+    new Set(
+      [
+        'DIV',
+        'P',
+        'TABLE',
+        'TR',
+        'TD',
+        'LI',
+      ]
+    );
 
-  const isTeamsHeading = value =>
-    /^(?:Microsoft Teams(?:-möte| meeting))$/i
-      .test(
-        String(value || '')
-          .replace(/\u00a0/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-      );
+  const normalizeText =
+    value =>
+      String(
+        value ||
+        ''
+      )
+        .replace(
+          /\u00a0/g,
+          ' '
+        )
+        .replace(
+          /\s+/g,
+          ' '
+        )
+        .trim();
 
-  const isSeparator = value =>
-    /^[_\-—–]{20,}$/
-      .test(
-        String(value || '')
-          .replace(/\u00a0/g, ' ')
-          .replace(/\s+/g, '')
-          .trim()
-      );
+  const isTeamsHeading =
+    value =>
+      /^(?:Microsoft Teams(?:-möte| meeting))$/i
+        .test(
+          normalizeText(
+            value
+          )
+        );
 
-  const isOrganizerLine = value =>
-    /^(?:För organisatörer:|For organizers:)/i
-      .test(
-        String(value || '')
-          .replace(/\u00a0/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-      );
+  const isSeparator =
+    value =>
+      /^[_\-—–]{20,}$/
+        .test(
+          String(
+            value ||
+            ''
+          )
+            .replace(
+              /\u00a0/g,
+              ' '
+            )
+            .replace(
+              /\s+/g,
+              ''
+            )
+            .trim()
+        );
+
+  const isOrganizerLine =
+    value =>
+      /^(?:För organisatörer:|For organizers:)/i
+        .test(
+          normalizeText(
+            value
+          )
+        );
 
   const allElements =
-    Array.from(wrapper.querySelectorAll('*'));
+    Array.from(
+      wrapper
+        .querySelectorAll(
+          '*'
+        )
+    );
 
-  for (const element of allElements) {
-    if (!element.isConnected) {
+  for (
+    const element
+    of allElements
+  ) {
+    if (
+      !element.isConnected
+    ) {
       continue;
     }
 
     const elementText =
-      (element.textContent || '')
-        .replace(/\u00a0/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      normalizeText(
+        element.textContent ||
+        ''
+      );
 
-    if (!isTeamsHeading(elementText)) {
+    if (
+      !isTeamsHeading(
+        elementText
+      )
+    ) {
       continue;
     }
 
-    /*
-     * Walk upward to a sensible block-level node, but do not jump all the way
-     * to the wrapper because that could remove the user's actual agenda.
-     */
-    let startNode = element;
+    let startNode =
+      element;
 
     while (
       startNode.parentElement &&
-      startNode.parentElement !== wrapper &&
-      !blockTags.has(startNode.nodeName)
+      startNode.parentElement !==
+        wrapper &&
+      !blockTags.has(
+        startNode.nodeName
+      )
     ) {
-      startNode = startNode.parentElement;
+      startNode =
+        startNode
+          .parentElement;
     }
 
-    /*
-     * Outlook usually places the generated Teams content in consecutive block
-     * siblings. Remove from the Teams heading through the closing separator.
-     *
-     * If there is no separator, stop after the organizer line and a small
-     * amount of generated trailing content.
-     */
-    let node = startNode;
-    let organizerSeen = false;
-    let removedCount = 0;
+    let node =
+      startNode;
 
-    while (node && node !== wrapper) {
+    let organizerSeen =
+      false;
+
+    let removedCount =
+      0;
+
+    while (
+      node &&
+      node !== wrapper
+    ) {
       const next =
-        node.nextElementSibling;
+        node
+          .nextElementSibling;
 
       const nodeText =
-        (node.textContent || '')
-          .replace(/\u00a0/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        normalizeText(
+          node.textContent ||
+          ''
+        );
 
-      if (isOrganizerLine(nodeText)) {
-        organizerSeen = true;
+      if (
+        isOrganizerLine(
+          nodeText
+        )
+      ) {
+        organizerSeen =
+          true;
       }
 
       const separator =
-        isSeparator(nodeText);
+        isSeparator(
+          nodeText
+        );
 
       node.remove();
-      removedCount += 1;
 
-      /*
-       * The first separator may be the line immediately above the Teams
-       * heading. Only treat a separator as the end once content has actually
-       * been removed after the heading.
-       */
+      removedCount +=
+        1;
+
       if (
         separator &&
         removedCount > 1
@@ -1533,69 +2512,103 @@ function removeTeamsInviteBlockHtml(html) {
         break;
       }
 
-      /*
-       * Some Outlook variants do not include the bottom separator as its own
-       * element. Once the organizer line has been removed, stop if the next
-       * sibling does not look like Teams boilerplate.
-       */
       if (
         organizerSeen &&
         next
       ) {
         const nextText =
-          (next.textContent || '')
-            .replace(/\u00a0/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+          normalizeText(
+            next.textContent ||
+            ''
+          );
 
         if (
-          !isSeparator(nextText) &&
-          !/^(?:Privacy and security|Sekretess och säkerhet)/i.test(nextText)
+          !isSeparator(
+            nextText
+          ) &&
+          !/^(?:Privacy and security|Sekretess och säkerhet)/i
+            .test(
+              nextText
+            )
         ) {
           break;
         }
       }
 
-      node = next;
+      node =
+        next;
     }
   }
 
-  /*
-   * Remove standalone Teams-related links that may remain after block removal.
-   */
-  for (const link of wrapper.querySelectorAll('a')) {
+  for (
+    const link
+    of wrapper
+      .querySelectorAll(
+        'a'
+      )
+  ) {
     const href =
-      (link.getAttribute('href') || '').toLowerCase();
+      (
+        link.getAttribute(
+          'href'
+        ) ||
+        ''
+      )
+        .toLowerCase();
 
     const linkText =
-      (link.textContent || '')
-        .replace(/\u00a0/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+      normalizeText(
+        link.textContent ||
+        ''
+      )
         .toLowerCase();
 
     if (
-      href.includes('teams.microsoft.com') ||
-      href.includes('teams.live.com') ||
-      href.includes('aka.ms/jointeamsmeeting') ||
-      linkText.includes('join microsoft teams') ||
-      linkText.includes('join teams meeting') ||
-      linkText === 'behöver du hjälp?' ||
-      linkText === 'need help?'
+      href.includes(
+        'teams.microsoft.com'
+      ) ||
+      href.includes(
+        'teams.live.com'
+      ) ||
+      href.includes(
+        'aka.ms/jointeamsmeeting'
+      ) ||
+      linkText.includes(
+        'join microsoft teams'
+      ) ||
+      linkText.includes(
+        'join teams meeting'
+      ) ||
+      linkText ===
+        'behöver du hjälp?' ||
+      linkText ===
+        'need help?'
     ) {
       const container =
         link.parentElement;
 
       const onlyContent =
         container &&
-        container.textContent.trim() ===
-          link.textContent.trim();
+        normalizeText(
+          container.textContent
+        ) ===
+        normalizeText(
+          link.textContent
+        );
 
       if (
         onlyContent &&
-        ['P', 'DIV', 'LI'].includes(container.nodeName)
+        [
+          'P',
+          'DIV',
+          'LI',
+        ]
+          .includes(
+            container.nodeName
+          )
       ) {
         container.remove();
+
       } else {
         link.remove();
       }
@@ -1606,116 +2619,764 @@ function removeTeamsInviteBlockHtml(html) {
 }
 
 
-/**
- * Remove a Microsoft Teams invitation block from plain text / Markdown.
- *
- * This is intentionally kept as a second-stage fallback after Turndown.
- * HTML removal is the primary mechanism.
- */
-function removeTeamsInviteText(text) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEAMS BLOCK REMOVAL — TEXT FALLBACK
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function removeTeamsInviteText(
+  text
+) {
   let result =
-    String(text || '')
-      .replace(/\r\n/g, '\n');
+    String(
+      text ||
+      ''
+    )
+      .replace(
+        /\r\n/g,
+        '\n'
+      );
 
-  /*
-   * Main pattern: remove the Teams heading and everything up to the closing
-   * separator line.
-   */
-  result = result.replace(
-    /(?:^|\n)[ \t]*(?:[_\-—–]{10,})?[ \t]*\n?[ \t]*(?:\*\*)?Microsoft Teams(?:-möte| meeting)(?:\*\*)?[ \t]*\n[\s\S]*?(?=\n[ \t]*(?:[_\-—–]{10,})[ \t]*(?:\n|$)|$)/gi,
-    '\n'
-  );
+  result =
+    result.replace(
+      /(?:^|\n)[ \t]*(?:[_\-—–]{10,})?[ \t]*\n?[ \t]*(?:\*\*)?Microsoft Teams(?:-möte| meeting)(?:\*\*)?[ \t]*\n[\s\S]*?(?=\n[ \t]*(?:[_\-—–]{10,})[ \t]*(?:\n|$)|$)/gi,
+      '\n'
+    );
 
-  /*
-   * Fallback when Turndown/Outlook has removed or transformed the separator.
-   */
-  result = result.replace(
-    /(?:^|\n)[ \t]*(?:\*\*)?Microsoft Teams(?:-möte| meeting)(?:\*\*)?[ \t]*\n[\s\S]*?(?:För organisatörer:|For organizers:)[^\n]*(?:\n|$)/gi,
-    '\n'
-  );
+  result =
+    result.replace(
+      /(?:^|\n)[ \t]*(?:\*\*)?Microsoft Teams(?:-möte| meeting)(?:\*\*)?[ \t]*\n[\s\S]*?(?:För organisatörer:|For organizers:)[^\n]*(?:\n|$)/gi,
+      '\n'
+    );
 
-  /*
-   * Remove any remaining Teams URLs.
-   */
-  result = result.replace(
-    /https?:\/\/(?:[\w-]+\.)?(?:teams\.microsoft\.com|teams\.live\.com)\/\S+/gi,
-    ''
-  );
+  result =
+    result.replace(
+      /https?:\/\/(?:[\w-]+\.)?(?:teams\.microsoft\.com|teams\.live\.com)\/\S+/gi,
+      ''
+    );
 
-  result = result.replace(
-    /https?:\/\/aka\.ms\/JoinTeamsMeeting\S*/gi,
-    ''
-  );
+  result =
+    result.replace(
+      /https?:\/\/aka\.ms\/JoinTeamsMeeting\S*/gi,
+      ''
+    );
 
-  /*
-   * Remove help-link text that may survive independently.
-   */
-  result = result.replace(
-    /(?:^|\n)[ \t]*(?:\[[^\]]*\]\([^)]+\)|(?:Behöver du hjälp\?|Need help\?))[ \t]*(?:\|)?[ \t]*(?=\n|$)/gi,
-    '\n'
-  );
-
-  /*
-   * Clean up separator-only lines left by Outlook.
-   */
-  result = result.replace(
-    /(?:^|\n)[ \t]*[_\-—–]{20,}[ \t]*(?=\n|$)/g,
-    ''
-  );
+  result =
+    result.replace(
+      /(?:^|\n)[ \t]*(?:\[[^\]]*\]\([^)]+\)|(?:Behöver du hjälp\?|Need help\?))[ \t]*(?:\|)?[ \t]*(?=\n|$)/gi,
+      '\n'
+    );
 
   return result
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(
+      /[ \t]+\n/g,
+      '\n'
+    )
+    .replace(
+      /\n{3,}/g,
+      '\n\n'
+    )
     .trim();
 }
 
 
-/**
- * Outlook often represents a table header as bold <td> cells rather than
- * actual <th> elements. Promote the first row to <th> when no header exists
- * so Turndown's GFM table converter can recognize the table.
- */
-function promoteOutlookTableHeaders(html) {
-  const wrapper =
-    document.createElement('div');
+/* ═══════════════════════════════════════════════════════════════════════════
+   OUTLOOK LIST NORMALIZATION
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  wrapper.innerHTML = html;
+/**
+ * Repairs list nesting when Outlook presents a child <ul>/<ol> as a sibling
+ * rather than as a child of the previous <li>.
+ */
+function normalizeOutlookListNesting(
+  html
+) {
+  const wrapper =
+    document
+      .createElement(
+        'div'
+      );
+
+  wrapper.innerHTML =
+    html ||
+    '';
+
+
+  function getMsoListInfo(
+    element
+  ) {
+    const candidates = [
+      element,
+      ...element
+        .querySelectorAll(
+          '[style*="mso-list"]'
+        ),
+    ];
+
+    for (
+      const candidate
+      of candidates
+    ) {
+      const style =
+        candidate
+          .getAttribute(
+            'style'
+          ) ||
+        '';
+
+      const match =
+        style.match(
+          /mso-list:\s*([^;]*?)\blevel(\d+)\b([^;]*)/i
+        );
+
+      if (match) {
+        const listIdMatch =
+          `${match[1]} ${match[3]}`
+            .match(
+              /\bl(\d+)\b/i
+            );
+
+        const lfoMatch =
+          `${match[1]} ${match[3]}`
+            .match(
+              /\blfo(\d+)\b/i
+            );
+
+        return {
+          level:
+            Number(
+              match[2]
+            ),
+
+          listId:
+            listIdMatch
+              ? listIdMatch[1]
+              : null,
+
+          lfo:
+            lfoMatch
+              ? lfoMatch[1]
+              : null,
+        };
+      }
+    }
+
+    return {
+      level:
+        null,
+
+      listId:
+        null,
+
+      lfo:
+        null,
+    };
+  }
+
+
+  function cssLengthToPx(
+    value,
+    unit
+  ) {
+    const n =
+      Number(
+        value
+      );
+
+    if (
+      !Number.isFinite(
+        n
+      )
+    ) {
+      return null;
+    }
+
+    switch (
+      (
+        unit ||
+        'px'
+      )
+        .toLowerCase()
+    ) {
+      case 'pt':
+        return n *
+          (96 / 72);
+
+      case 'cm':
+        return n *
+          (96 / 2.54);
+
+      case 'mm':
+        return n *
+          (96 / 25.4);
+
+      case 'in':
+        return n *
+          96;
+
+      default:
+        return n;
+    }
+  }
+
+
+  function getIndent(
+    element
+  ) {
+    const candidates = [
+      element,
+      element
+        .querySelector(
+          'li'
+        ),
+      element
+        .querySelector(
+          '[style*="margin-left"]'
+        ),
+      element
+        .querySelector(
+          '[style*="text-indent"]'
+        ),
+    ]
+      .filter(
+        Boolean
+      );
+
+    for (
+      const candidate
+      of candidates
+    ) {
+      const style =
+        candidate
+          .getAttribute(
+            'style'
+          ) ||
+        '';
+
+      const marginMatch =
+        style.match(
+          /margin-left\s*:\s*(-?\d+(?:\.\d+)?)\s*(px|pt|cm|mm|in)?/i
+        );
+
+      if (
+        marginMatch
+      ) {
+        const px =
+          cssLengthToPx(
+            marginMatch[1],
+            marginMatch[2]
+          );
+
+        if (
+          px !== null
+        ) {
+          return px;
+        }
+      }
+    }
+
+    return null;
+  }
+
+
+  function isEffectivelyEmpty(
+    node
+  ) {
+    if (!node) {
+      return true;
+    }
+
+    if (
+      node.nodeType ===
+      Node.TEXT_NODE
+    ) {
+      return !(
+        node.textContent ||
+        ''
+      )
+        .replace(
+          /\u00a0/g,
+          ' '
+        )
+        .trim();
+    }
+
+    if (
+      node.nodeType !==
+      Node.ELEMENT_NODE
+    ) {
+      return true;
+    }
+
+    const text =
+      (
+        node.textContent ||
+        ''
+      )
+        .replace(
+          /\u00a0/g,
+          ' '
+        )
+        .trim();
+
+    if (text) {
+      return false;
+    }
+
+    return !node
+      .querySelector(
+        'img, table, hr, br:not(:only-child)'
+      );
+  }
+
+
+  function areEffectivelyAdjacent(
+    first,
+    second
+  ) {
+    let node =
+      first.nextSibling;
+
+    while (
+      node &&
+      node !== second
+    ) {
+      if (
+        !isEffectivelyEmpty(
+          node
+        )
+      ) {
+        return false;
+      }
+
+      node =
+        node.nextSibling;
+    }
+
+    return node === second;
+  }
+
+
+  function sameOutlookList(
+    previousInfo,
+    currentInfo
+  ) {
+    if (
+      previousInfo.listId !==
+        null &&
+      currentInfo.listId !==
+        null &&
+      previousInfo.listId !==
+        currentInfo.listId
+    ) {
+      return false;
+    }
+
+    if (
+      previousInfo.lfo !==
+        null &&
+      currentInfo.lfo !==
+        null &&
+      previousInfo.lfo !==
+        currentInfo.lfo
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+
+  let changed =
+    true;
+
+  let safetyCounter =
+    0;
+
+  while (
+    changed &&
+    safetyCounter <
+      1000
+  ) {
+    changed =
+      false;
+
+    safetyCounter +=
+      1;
+
+    const lists =
+      Array.from(
+        wrapper
+          .querySelectorAll(
+            'ol, ul'
+          )
+      );
+
+    for (
+      const currentList
+      of lists
+    ) {
+      if (
+        !currentList.isConnected
+      ) {
+        continue;
+      }
+
+      let previous =
+        currentList
+          .previousElementSibling;
+
+      while (
+        previous &&
+        isEffectivelyEmpty(
+          previous
+        )
+      ) {
+        previous =
+          previous
+            .previousElementSibling;
+      }
+
+      if (
+        !previous ||
+        ![
+          'OL',
+          'UL',
+        ]
+          .includes(
+            previous.nodeName
+          )
+      ) {
+        continue;
+      }
+
+      if (
+        !areEffectivelyAdjacent(
+          previous,
+          currentList
+        )
+      ) {
+        continue;
+      }
+
+      const previousInfo =
+        getMsoListInfo(
+          previous
+        );
+
+      const currentInfo =
+        getMsoListInfo(
+          currentList
+        );
+
+      const previousIndent =
+        getIndent(
+          previous
+        );
+
+      const currentIndent =
+        getIndent(
+          currentList
+        );
+
+      const nestedByMsoLevel =
+        previousInfo.level !==
+          null &&
+        currentInfo.level !==
+          null &&
+        sameOutlookList(
+          previousInfo,
+          currentInfo
+        ) &&
+        currentInfo.level >
+          previousInfo.level;
+
+      const nestedByIndent =
+        previousIndent !==
+          null &&
+        currentIndent !==
+          null &&
+        currentIndent >
+          previousIndent +
+          8;
+
+      const noContradictingLevel =
+        previousInfo.level ===
+          null ||
+        currentInfo.level ===
+          null ||
+        currentInfo.level >
+          previousInfo.level;
+
+      const nestedByCommonPattern =
+        previous.nodeName ===
+          'OL' &&
+        currentList.nodeName ===
+          'UL' &&
+        noContradictingLevel;
+
+      if (
+        !nestedByMsoLevel &&
+        !nestedByIndent &&
+        !nestedByCommonPattern
+      ) {
+        continue;
+      }
+
+      const lastItem =
+        Array.from(
+          previous.children
+        )
+          .reverse()
+          .find(
+            child =>
+              child.nodeName ===
+              'LI'
+          );
+
+      if (
+        !lastItem
+      ) {
+        continue;
+      }
+
+      lastItem
+        .appendChild(
+          currentList
+        );
+
+      changed =
+        true;
+
+      break;
+    }
+  }
+
+  return wrapper.innerHTML;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPACT MARKDOWN
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Final cleanup after Turndown.
+ *
+ * Keeps paragraphs readable while making lists compact.
+ */
+function compactMarkdown(
+  markdown
+) {
+  let result =
+    String(
+      markdown ||
+      ''
+    )
+      .replace(
+        /\r\n?/g,
+        '\n'
+      )
+      .replace(
+        /\u00a0/g,
+        ' '
+      )
+      .replace(
+        /[ \t]+$/gm,
+        ''
+      );
+
+
+  /*
+   * Remove long Outlook separator lines.
+   *
+   * Normal Markdown "---" is left intact.
+   */
+  result =
+    result
+      .replace(
+        /^[ \t]*_{20,}[ \t]*$/gm,
+        ''
+      )
+      .replace(
+        /^[ \t]*-{10,}[ \t]*$/gm,
+        ''
+      );
+
+
+  /*
+   * Remove empty list items.
+   *
+   * Examples:
+   *
+   *   5.
+   *   5)
+   *   -
+   */
+  result =
+    result
+      .replace(
+        /^[ \t]*\d+[.)][ \t]*$/gm,
+        ''
+      )
+      .replace(
+        /^[ \t]*[-*+][ \t]*$/gm,
+        ''
+      );
+
+
+  /*
+   * Remove blank lines between consecutive bullet items.
+   */
+  result =
+    result.replace(
+      /^([ \t]*[-*+] .+)\n[ \t]*\n(?=[ \t]*[-*+] )/gm,
+      '$1\n'
+    );
+
+
+  /*
+   * Remove blank lines between consecutive numbered items.
+   */
+  result =
+    result.replace(
+      /^([ \t]*\d+[.)] .+)\n[ \t]*\n(?=[ \t]*\d+[.)] )/gm,
+      '$1\n'
+    );
+
+
+  /*
+   * Remove blank line between numbered parent and nested bullet.
+   */
+  result =
+    result.replace(
+      /^([ \t]*\d+[.)] .+)\n[ \t]*\n(?=[ \t]+[-*+] )/gm,
+      '$1\n'
+    );
+
+
+  /*
+   * Remove blank line between nested bullet and next numbered item.
+   */
+  result =
+    result.replace(
+      /^([ \t]+[-*+] .+)\n[ \t]*\n(?=[ \t]*\d+[.)] )/gm,
+      '$1\n'
+    );
+
+
+  /*
+   * Second compaction pass.
+   */
+  result =
+    result
+      .replace(
+        /^([ \t]*[-*+] .+)\n[ \t]*\n(?=[ \t]*[-*+] )/gm,
+        '$1\n'
+      )
+      .replace(
+        /^([ \t]*\d+[.)] .+)\n[ \t]*\n(?=[ \t]*\d+[.)] )/gm,
+        '$1\n'
+      )
+      .replace(
+        /^([ \t]*\d+[.)] .+)\n[ \t]*\n(?=[ \t]+[-*+] )/gm,
+        '$1\n'
+      )
+      .replace(
+        /^([ \t]+[-*+] .+)\n[ \t]*\n(?=[ \t]*\d+[.)] )/gm,
+        '$1\n'
+      );
+
+
+  /*
+   * Never retain more than one empty line.
+   */
+  return result
+    .replace(
+      /\n{3,}/g,
+      '\n\n'
+    )
+    .trim();
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABLE NORMALIZATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function promoteOutlookTableHeaders(
+  html
+) {
+  const wrapper =
+    document
+      .createElement(
+        'div'
+      );
+
+  wrapper.innerHTML =
+    html;
 
   for (
     const table
-    of wrapper.querySelectorAll('table')
+    of wrapper
+      .querySelectorAll(
+        'table'
+      )
   ) {
     if (
-      table.querySelector('th') ||
-      table.querySelector('thead')
+      table.querySelector(
+        'th'
+      ) ||
+      table.querySelector(
+        'thead'
+      )
     ) {
       continue;
     }
 
     const firstRow =
-      table.querySelector('tr');
+      table
+        .querySelector(
+          'tr'
+        );
 
-    if (!firstRow) {
+    if (
+      !firstRow
+    ) {
       continue;
     }
 
     const tdCells =
-      Array.from(firstRow.children)
+      Array.from(
+        firstRow.children
+      )
         .filter(
-          cell => cell.nodeName === 'TD'
+          cell =>
+            cell.nodeName ===
+            'TD'
         );
 
-    if (tdCells.length === 0) {
+    if (
+      tdCells.length ===
+      0
+    ) {
       continue;
     }
 
-    for (const td of tdCells) {
+    for (
+      const td
+      of tdCells
+    ) {
       const th =
-        document.createElement('th');
+        document
+          .createElement(
+            'th'
+          );
 
       for (
         const attr
-        of Array.from(td.attributes)
+        of Array.from(
+          td.attributes
+        )
       ) {
         th.setAttribute(
           attr.name,
@@ -1723,13 +3384,69 @@ function promoteOutlookTableHeaders(html) {
         );
       }
 
-      while (td.firstChild) {
-        th.appendChild(td.firstChild);
+      while (
+        td.firstChild
+      ) {
+        th.appendChild(
+          td.firstChild
+        );
       }
 
-      td.parentNode.replaceChild(
-        th,
-        td
+      td.parentNode
+        .replaceChild(
+          th,
+          td
+        );
+    }
+  }
+
+  return wrapper.innerHTML;
+}
+
+
+function flattenTableCellBlocks(
+  html
+) {
+  const wrapper =
+    document
+      .createElement(
+        'div'
+      );
+
+  wrapper.innerHTML =
+    html;
+
+  for (
+    const cell
+    of wrapper
+      .querySelectorAll(
+        'td, th'
+      )
+  ) {
+    let block;
+
+    while (
+      (
+        block =
+          cell.querySelector(
+            'p, div'
+          )
+      )
+    ) {
+      const parent =
+        block.parentNode;
+
+      while (
+        block.firstChild
+      ) {
+        parent.insertBefore(
+          block.firstChild,
+          block
+        );
+      }
+
+      parent.removeChild(
+        block
       );
     }
   }
@@ -1738,58 +3455,26 @@ function promoteOutlookTableHeaders(html) {
 }
 
 
-/**
- * Markdown tables require cell content to remain on one line. Outlook wraps
- * content in <p>/<div>, so unwrap block elements inside table cells.
- */
-function flattenTableCellBlocks(html) {
-  const wrapper =
-    document.createElement('div');
+/* ═══════════════════════════════════════════════════════════════════════════
+   OUTLOOK HTML CLEANUP
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  wrapper.innerHTML = html;
-
-  for (
-    const cell
-    of wrapper.querySelectorAll('td, th')
-  ) {
-    let block;
-
-    while (
-      (
-        block =
-          cell.querySelector('p, div')
-      )
-    ) {
-      const parent =
-        block.parentNode;
-
-      while (block.firstChild) {
-        parent.insertBefore(
-          block.firstChild,
-          block
-        );
-      }
-
-      parent.removeChild(block);
-    }
-  }
-
-  return wrapper.innerHTML;
-}
-
-
-/**
- * Strip Office/Outlook HTML cruft that causes noisy Markdown conversion.
- */
-function cleanOutlookHtml(html) {
+function cleanOutlookHtml(
+  html
+) {
   return html
-    // MSO conditional comments.
+
+    /*
+     * MSO conditional comments.
+     */
     .replace(
       /<!--\[if[^>]*?\]>[\s\S]*?<!\[endif\]-->/gi,
       ''
     )
 
-    // Outlook <o:p> elements.
+    /*
+     * Outlook <o:p> elements.
+     */
     .replace(
       /<o:p[^>]*>[\s\S]*?<\/o:p>/gi,
       ''
@@ -1799,13 +3484,17 @@ function cleanOutlookHtml(html) {
       ''
     )
 
-    // Remove complete style blocks before stripping remaining head tags.
+    /*
+     * Style blocks.
+     */
     .replace(
       /<style[\s\S]*?<\/style>/gi,
       ''
     )
 
-    // Remaining metadata/head leftovers.
+    /*
+     * Remaining metadata/head leftovers.
+     */
     .replace(
       /<\/?(?:meta|link|style)\b[^>]*>/gi,
       ''
@@ -1817,146 +3506,202 @@ function cleanOutlookHtml(html) {
    ATTENDEE EXTRACTION — OFFICE.JS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * Extract attendees using Office.js.
- *
- * When appointmentResponse is populated, attendees are grouped by RSVP.
- * Otherwise they appear under "No Response".
- */
-function getAttendeesViaOfficeJs(item) {
-  return new Promise(async resolve => {
-    const result = {
-      'Accepted':    new Map(),
-      'Tentative':   new Map(),
-      'Declined':    new Map(),
-      'No Response': new Map(),
-    };
+function getAttendeesViaOfficeJs(
+  item
+) {
+  return new Promise(
+    async resolve => {
+      const result = {
+        'Accepted':
+          new Map(),
 
-    const RESPONSE_MAP = {
-      accepted:  'Accepted',
-      tentative: 'Tentative',
-      declined:  'Declined',
-      none:      'No Response',
-      organizer: null,
-    };
+        'Tentative':
+          new Map(),
 
-    async function fetchList(prop) {
-      const value =
-        item[prop];
+        'Declined':
+          new Map(),
 
-      if (!value) {
+        'No Response':
+          new Map(),
+      };
+
+      const RESPONSE_MAP = {
+        accepted:
+          'Accepted',
+
+        tentative:
+          'Tentative',
+
+        declined:
+          'Declined',
+
+        none:
+          'No Response',
+
+        organizer:
+          null,
+      };
+
+
+      async function fetchList(
+        prop
+      ) {
+        const value =
+          item[prop];
+
+        if (!value) {
+          return [];
+        }
+
+        if (
+          Array.isArray(
+            value
+          )
+        ) {
+          return value;
+        }
+
+        if (
+          typeof value
+            .getAsync ===
+          'function'
+        ) {
+          return await new Promise(
+            res => {
+              value.getAsync(
+                r => {
+                  res(
+                    r.status ===
+                      Office.AsyncResultStatus.Succeeded
+                      ? (
+                          r.value ||
+                          []
+                        )
+                      : []
+                  );
+                }
+              );
+            }
+          );
+        }
+
         return [];
       }
 
-      // Read mode.
-      if (Array.isArray(value)) {
-        return value;
-      }
 
-      // Compose mode.
-      if (
-        typeof value.getAsync === 'function'
+      const required =
+        await fetchList(
+          'requiredAttendees'
+        );
+
+      const optional =
+        await fetchList(
+          'optionalAttendees'
+        );
+
+      for (
+        const attendee
+        of [
+          ...required,
+          ...optional,
+        ]
       ) {
-        return await new Promise(res => {
-          value.getAsync(r => {
-            res(
-              r.status ===
-                Office.AsyncResultStatus.Succeeded
-                ? r.value || []
-                : []
-            );
-          });
-        });
+        const name =
+          attendee.displayName ||
+          attendee.emailAddress ||
+          '';
+
+        const email =
+          (
+            attendee.emailAddress ||
+            ''
+          )
+            .toLowerCase();
+
+        if (!name) {
+          continue;
+        }
+
+        const responseType =
+          (
+            attendee.appointmentResponse ||
+            'none'
+          )
+            .toString()
+            .toLowerCase();
+
+        const bucket =
+          Object.prototype
+            .hasOwnProperty
+            .call(
+              RESPONSE_MAP,
+              responseType
+            )
+            ? RESPONSE_MAP[
+                responseType
+              ]
+            : 'No Response';
+
+        if (
+          bucket === null
+        ) {
+          continue;
+        }
+
+        result[
+          bucket
+        ].set(
+          name,
+          email
+        );
       }
 
-      return [];
-    }
-
-    const required =
-      await fetchList('requiredAttendees');
-
-    const optional =
-      await fetchList('optionalAttendees');
-
-    for (
-      const attendee
-      of [...required, ...optional]
-    ) {
-      const name =
-        attendee.displayName ||
-        attendee.emailAddress ||
-        '';
-
-      const email =
-        (attendee.emailAddress || '')
-          .toLowerCase();
-
-      if (!name) {
-        continue;
-      }
-
-      const responseType =
-        (
-          attendee.appointmentResponse ||
-          'none'
-        )
-          .toString()
-          .toLowerCase();
-
-      const bucket =
-        Object.prototype.hasOwnProperty.call(
-          RESPONSE_MAP,
-          responseType
-        )
-          ? RESPONSE_MAP[responseType]
-          : 'No Response';
-
-      // Organizer is captured separately from item.organizer.
-      if (bucket === null) {
-        continue;
-      }
-
-      result[bucket].set(
-        name,
-        email
+      resolve(
+        result
       );
     }
-
-    resolve(result);
-  });
+  );
 }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
    EWS — ATTENDEES WITH RSVP STATUS
-   ═══════════════════════════════════════════════════════════════════════════
-   Preserved from the upstream implementation.
-
-   Requires ReadWriteMailbox permission in the existing manifest.
-   If EWS fails, extractMeetingDetails() falls back to Office.js.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function getAttendeesViaEws(itemId) {
-  return new Promise((resolve, reject) => {
-    // Some Outlook clients expose a REST-formatted item ID.
-    // EWS needs its own ID format.
-    let ewsId = itemId;
+function getAttendeesViaEws(
+  itemId
+) {
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
+      let ewsId =
+        itemId;
 
-    try {
-      const converted =
-        Office.context.mailbox.convertToEwsId(
-          itemId,
-          Office.MailboxEnums.RestVersion.v2_0
-        );
+      try {
+        const converted =
+          Office.context
+            .mailbox
+            .convertToEwsId(
+              itemId,
+              Office.MailboxEnums
+                .RestVersion
+                .v2_0
+            );
 
-      if (converted) {
-        ewsId = converted;
+        if (
+          converted
+        ) {
+          ewsId =
+            converted;
+        }
+
+      } catch (_) {
+        // Already EWS format or conversion unavailable.
       }
-    } catch (_) {
-      // Already EWS format or conversion unavailable.
-    }
 
-    const soap =
+      const soap =
 `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1983,87 +3728,95 @@ function getAttendeesViaEws(itemId) {
   </soap:Body>
 </soap:Envelope>`;
 
-    Office.context.mailbox.makeEwsRequestAsync(
-      soap,
-      result => {
-        if (
-          result.status !==
-          Office.AsyncResultStatus.Succeeded
-        ) {
-          const err =
-            result.error || {};
+      Office.context
+        .mailbox
+        .makeEwsRequestAsync(
+          soap,
+          result => {
+            if (
+              result.status !==
+              Office.AsyncResultStatus.Succeeded
+            ) {
+              const err =
+                result.error ||
+                {};
 
-          const code =
-            err.code != null
-              ? ` code=${err.code}`
-              : '';
+              const code =
+                err.code != null
+                  ? ` code=${err.code}`
+                  : '';
 
-          const name =
-            err.name
-              ? ` name=${err.name}`
-              : '';
+              const name =
+                err.name
+                  ? ` name=${err.name}`
+                  : '';
 
-          const body =
-            typeof result.value === 'string' &&
-            result.value.length > 0
-              ? (
-                  ' body=' +
-                  result.value
-                    .replace(/\s+/g, ' ')
-                    .slice(0, 400)
+              const body =
+                typeof result.value ===
+                  'string' &&
+                result.value.length > 0
+                  ? (
+                      ' body=' +
+                      result.value
+                        .replace(
+                          /\s+/g,
+                          ' '
+                        )
+                        .slice(
+                          0,
+                          400
+                        )
+                    )
+                  : '';
+
+              reject(
+                new Error(
+                  (
+                    err.message ||
+                    'EWS request failed'
+                  ) +
+                  code +
+                  name +
+                  body
                 )
-              : '';
+              );
 
-          reject(
-            new Error(
-              (
-                err.message ||
-                'EWS request failed'
-              ) +
-              code +
-              name +
-              body
-            )
-          );
+              return;
+            }
 
-          return;
-        }
+            try {
+              resolve(
+                parseEwsAttendees(
+                  result.value
+                )
+              );
 
-        try {
-          resolve(
-            parseEwsAttendees(
-              result.value
-            )
-          );
-        } catch (e) {
-          reject(e);
-        }
-      }
-    );
-  });
+            } catch (e) {
+              reject(e);
+            }
+          }
+        );
+    }
+  );
 }
 
 
-/**
- * Parse EWS GetItem XML and return attendees grouped by RSVP status.
- *
- * EWS ResponseType values include:
- *   None
- *   Organizer
- *   Tentative
- *   Accept
- *   Decline
- *   NoResponseReceived
- */
-function parseEwsAttendees(xmlString) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   EWS PARSING
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function parseEwsAttendees(
+  xmlString
+) {
   const parser =
     new DOMParser();
 
   const doc =
-    parser.parseFromString(
-      xmlString,
-      'text/xml'
-    );
+    parser
+      .parseFromString(
+        xmlString,
+        'text/xml'
+      );
 
   const T =
     'http://schemas.microsoft.com/exchange/services/2006/types';
@@ -2075,17 +3828,26 @@ function parseEwsAttendees(xmlString) {
   /* ── Surface EWS errors ───────────────────────────────────────────────── */
 
   const responseMsgs =
-    doc.getElementsByTagNameNS(
-      M,
-      'GetItemResponseMessage'
-    );
+    doc
+      .getElementsByTagNameNS(
+        M,
+        'GetItemResponseMessage'
+      );
 
-  if (responseMsgs.length > 0) {
+  if (
+    responseMsgs.length >
+    0
+  ) {
     const responseClass =
       responseMsgs[0]
-        .getAttribute('ResponseClass');
+        .getAttribute(
+          'ResponseClass'
+        );
 
-    if (responseClass === 'Error') {
+    if (
+      responseClass ===
+      'Error'
+    ) {
       const code =
         responseMsgs[0]
           .getElementsByTagNameNS(
@@ -2105,36 +3867,58 @@ function parseEwsAttendees(xmlString) {
   /* ── RSVP buckets ─────────────────────────────────────────────────────── */
 
   const result = {
-    'Accepted':    new Map(),
-    'Tentative':   new Map(),
-    'Declined':    new Map(),
-    'No Response': new Map(),
+    'Accepted':
+      new Map(),
+
+    'Tentative':
+      new Map(),
+
+    'Declined':
+      new Map(),
+
+    'No Response':
+      new Map(),
   };
 
   const RSVP_MAP = {
-    accept:             'Accepted',
-    tentative:          'Tentative',
-    decline:            'Declined',
-    none:               'No Response',
-    noresponsereceived: 'No Response',
-    organizer:          null,
+    accept:
+      'Accepted',
+
+    tentative:
+      'Tentative',
+
+    decline:
+      'Declined',
+
+    none:
+      'No Response',
+
+    noresponsereceived:
+      'No Response',
+
+    organizer:
+      null,
   };
 
 
-  function processAttendeeGroup(tagName) {
+  function processAttendeeGroup(
+    tagName
+  ) {
     for (
       const group
-      of doc.getElementsByTagNameNS(
-        T,
-        tagName
-      )
+      of doc
+        .getElementsByTagNameNS(
+          T,
+          tagName
+        )
     ) {
       for (
         const attendeeEl
-        of group.getElementsByTagNameNS(
-          T,
-          'Attendee'
-        )
+        of group
+          .getElementsByTagNameNS(
+            T,
+            'Attendee'
+          )
       ) {
         const name =
           attendeeEl
@@ -2172,30 +3956,40 @@ function parseEwsAttendees(xmlString) {
           )
             .toLowerCase();
 
-        if (!name) {
+        if (
+          !name
+        ) {
           continue;
         }
 
         const bucket =
-          Object.prototype.hasOwnProperty.call(
-            RSVP_MAP,
-            responseType
-          )
-            ? RSVP_MAP[responseType]
+          Object.prototype
+            .hasOwnProperty
+            .call(
+              RSVP_MAP,
+              responseType
+            )
+            ? RSVP_MAP[
+                responseType
+              ]
             : 'No Response';
 
-        // Organizer is captured separately.
-        if (bucket === null) {
+        if (
+          bucket === null
+        ) {
           continue;
         }
 
-        result[bucket].set(
+        result[
+          bucket
+        ].set(
           name,
           email
         );
       }
     }
   }
+
 
   processAttendeeGroup(
     'RequiredAttendees'
