@@ -1300,14 +1300,17 @@ function getBodyMarkdown(item) {
             Office.AsyncResultStatus.Succeeded ||
           !result.value
         ) {
-          getBodyText(item).then(resolve);
+          getBodyText(item)
+            .then(text => resolve(removeTeamsInviteText(text)));
           return;
         }
 
         const html =
           flattenTableCellBlocks(
             promoteOutlookTableHeaders(
-              cleanOutlookHtml(result.value)
+              removeTeamsInviteLinks(
+                cleanOutlookHtml(result.value)
+              )
             )
           );
 
@@ -1377,11 +1380,64 @@ function getBodyMarkdown(item) {
             e.message
           );
 
-          getBodyText(item).then(resolve);
+          getBodyText(item)
+            .then(text => resolve(removeTeamsInviteText(text)));
         }
       }
     );
   });
+}
+
+
+/**
+ * Remove Microsoft Teams join links while retaining the surrounding agenda.
+ */
+function removeTeamsInviteLinks(html) {
+  const wrapper =
+    document.createElement('div');
+
+  wrapper.innerHTML = html;
+
+  for (const link of wrapper.querySelectorAll('a')) {
+    const href =
+      (link.getAttribute('href') || '').toLowerCase();
+
+    const text =
+      (link.textContent || '').toLowerCase();
+
+    if (
+      href.includes('teams.microsoft.com') ||
+      href.includes('teams.live.com') ||
+      text.includes('join microsoft teams') ||
+      text.includes('join teams meeting')
+    ) {
+      const container = link.parentElement;
+      const onlyContent = container &&
+        container.textContent.trim() === link.textContent.trim();
+
+      if (
+        onlyContent &&
+        ['P', 'DIV', 'LI'].includes(container.nodeName)
+      ) {
+        container.remove();
+      } else {
+        link.remove();
+      }
+    }
+  }
+
+  return wrapper.innerHTML;
+}
+
+
+function removeTeamsInviteText(text) {
+  return String(text || '')
+    .replace(
+      /https?:\/\/(?:[\w-]+\.)?(?:teams\.microsoft\.com|teams\.live\.com)\/\S+/gi,
+      ''
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 

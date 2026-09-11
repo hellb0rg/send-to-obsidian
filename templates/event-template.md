@@ -1,5 +1,6 @@
 ---
 type: meeting
+title: {{title}}
 date: {{date}}
 start: {{start_time_yaml}}
 end: {{end_time_yaml}}
@@ -13,8 +14,6 @@ tags:
   - meeting
 ---
 
-# {{title}}
-
 > [!info] Meeting
 > **Date:** {{date}}  
 > **Time:** {{start_time}}–{{end_time}}  
@@ -22,5 +21,9 @@ tags:
 > **Organizer:** {{organizer}}
 
 ## Förberedelser
+
+### Agenda / meddelande
+
+{{body}}
 
 ## Anteckningar
