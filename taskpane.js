@@ -1308,7 +1308,7 @@ function getBodyMarkdown(item) {
         const html =
           flattenTableCellBlocks(
             promoteOutlookTableHeaders(
-              removeTeamsInviteLinks(
+              removeTeamsInviteBlockHtml(
                 cleanOutlookHtml(result.value)
               )
             )
@@ -1390,30 +1390,206 @@ function getBodyMarkdown(item) {
 
 
 /**
- * Remove Microsoft Teams join links while retaining the surrounding agenda.
+ * Remove the complete Microsoft Teams invitation block from Outlook HTML.
+ *
+ * Primary strategy:
+ *   1. Remove known Teams placeholder containers when Outlook provides them.
+ *   2. Otherwise locate the Teams heading and remove the surrounding generated
+ *      block up to the closing separator / organizer section.
+ *   3. Finally remove any standalone Teams join/help links that remain.
+ *
+ * The original meeting description / agenda outside the Teams block is kept.
  */
-function removeTeamsInviteLinks(html) {
+function removeTeamsInviteBlockHtml(html) {
   const wrapper =
     document.createElement('div');
 
-  wrapper.innerHTML = html;
+  wrapper.innerHTML = html || '';
 
+  /*
+   * Modern Outlook commonly wraps the generated Teams invitation in a
+   * dedicated element. Remove those first when present.
+   */
+  const knownTeamsSelectors = [
+    '[id*="MicrosoftTeamsMeetingPlaceholder"]',
+    '[id*="TeamsMeetingPlaceholder"]',
+    '[class*="MicrosoftTeamsMeetingPlaceholder"]',
+    '[class*="TeamsMeetingPlaceholder"]',
+  ];
+
+  for (const selector of knownTeamsSelectors) {
+    for (const node of wrapper.querySelectorAll(selector)) {
+      node.remove();
+    }
+  }
+
+  /*
+   * Fallback for Outlook versions/locales where no useful Teams container ID
+   * exists. Find a block whose text is the Teams heading and remove the
+   * generated siblings that follow it.
+   */
+  const blockTags =
+    new Set(['DIV', 'P', 'TABLE', 'TR', 'TD', 'LI']);
+
+  const isTeamsHeading = value =>
+    /^(?:Microsoft Teams(?:-möte| meeting))$/i
+      .test(
+        String(value || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+      );
+
+  const isSeparator = value =>
+    /^[_\-—–]{20,}$/
+      .test(
+        String(value || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, '')
+          .trim()
+      );
+
+  const isOrganizerLine = value =>
+    /^(?:För organisatörer:|For organizers:)/i
+      .test(
+        String(value || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+      );
+
+  const allElements =
+    Array.from(wrapper.querySelectorAll('*'));
+
+  for (const element of allElements) {
+    if (!element.isConnected) {
+      continue;
+    }
+
+    const elementText =
+      (element.textContent || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!isTeamsHeading(elementText)) {
+      continue;
+    }
+
+    /*
+     * Walk upward to a sensible block-level node, but do not jump all the way
+     * to the wrapper because that could remove the user's actual agenda.
+     */
+    let startNode = element;
+
+    while (
+      startNode.parentElement &&
+      startNode.parentElement !== wrapper &&
+      !blockTags.has(startNode.nodeName)
+    ) {
+      startNode = startNode.parentElement;
+    }
+
+    /*
+     * Outlook usually places the generated Teams content in consecutive block
+     * siblings. Remove from the Teams heading through the closing separator.
+     *
+     * If there is no separator, stop after the organizer line and a small
+     * amount of generated trailing content.
+     */
+    let node = startNode;
+    let organizerSeen = false;
+    let removedCount = 0;
+
+    while (node && node !== wrapper) {
+      const next =
+        node.nextElementSibling;
+
+      const nodeText =
+        (node.textContent || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      if (isOrganizerLine(nodeText)) {
+        organizerSeen = true;
+      }
+
+      const separator =
+        isSeparator(nodeText);
+
+      node.remove();
+      removedCount += 1;
+
+      /*
+       * The first separator may be the line immediately above the Teams
+       * heading. Only treat a separator as the end once content has actually
+       * been removed after the heading.
+       */
+      if (
+        separator &&
+        removedCount > 1
+      ) {
+        break;
+      }
+
+      /*
+       * Some Outlook variants do not include the bottom separator as its own
+       * element. Once the organizer line has been removed, stop if the next
+       * sibling does not look like Teams boilerplate.
+       */
+      if (
+        organizerSeen &&
+        next
+      ) {
+        const nextText =
+          (next.textContent || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (
+          !isSeparator(nextText) &&
+          !/^(?:Privacy and security|Sekretess och säkerhet)/i.test(nextText)
+        ) {
+          break;
+        }
+      }
+
+      node = next;
+    }
+  }
+
+  /*
+   * Remove standalone Teams-related links that may remain after block removal.
+   */
   for (const link of wrapper.querySelectorAll('a')) {
     const href =
       (link.getAttribute('href') || '').toLowerCase();
 
-    const text =
-      (link.textContent || '').toLowerCase();
+    const linkText =
+      (link.textContent || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 
     if (
       href.includes('teams.microsoft.com') ||
       href.includes('teams.live.com') ||
-      text.includes('join microsoft teams') ||
-      text.includes('join teams meeting')
+      href.includes('aka.ms/jointeamsmeeting') ||
+      linkText.includes('join microsoft teams') ||
+      linkText.includes('join teams meeting') ||
+      linkText === 'behöver du hjälp?' ||
+      linkText === 'need help?'
     ) {
-      const container = link.parentElement;
-      const onlyContent = container &&
-        container.textContent.trim() === link.textContent.trim();
+      const container =
+        link.parentElement;
+
+      const onlyContent =
+        container &&
+        container.textContent.trim() ===
+          link.textContent.trim();
 
       if (
         onlyContent &&
@@ -1430,16 +1606,65 @@ function removeTeamsInviteLinks(html) {
 }
 
 
+/**
+ * Remove a Microsoft Teams invitation block from plain text / Markdown.
+ *
+ * This is intentionally kept as a second-stage fallback after Turndown.
+ * HTML removal is the primary mechanism.
+ */
 function removeTeamsInviteText(text) {
-  return String(text || '')
-    .replace(
-      /(?:^|\n)[ \t]*(?:\*\*)?Microsoft Teams meeting(?:\*\*)?[ \t]*\n[\s\S]*?(?:\n[ \t]*For organizers:[^\n]*[ \t]*)/i,
-      ''
-    )
-    .replace(
-      /https?:\/\/(?:[\w-]+\.)?(?:teams\.microsoft\.com|teams\.live\.com)\/\S+/gi,
-      ''
-    )
+  let result =
+    String(text || '')
+      .replace(/\r\n/g, '\n');
+
+  /*
+   * Main pattern: remove the Teams heading and everything up to the closing
+   * separator line.
+   */
+  result = result.replace(
+    /(?:^|\n)[ \t]*(?:[_\-—–]{10,})?[ \t]*\n?[ \t]*(?:\*\*)?Microsoft Teams(?:-möte| meeting)(?:\*\*)?[ \t]*\n[\s\S]*?(?=\n[ \t]*(?:[_\-—–]{10,})[ \t]*(?:\n|$)|$)/gi,
+    '\n'
+  );
+
+  /*
+   * Fallback when Turndown/Outlook has removed or transformed the separator.
+   */
+  result = result.replace(
+    /(?:^|\n)[ \t]*(?:\*\*)?Microsoft Teams(?:-möte| meeting)(?:\*\*)?[ \t]*\n[\s\S]*?(?:För organisatörer:|For organizers:)[^\n]*(?:\n|$)/gi,
+    '\n'
+  );
+
+  /*
+   * Remove any remaining Teams URLs.
+   */
+  result = result.replace(
+    /https?:\/\/(?:[\w-]+\.)?(?:teams\.microsoft\.com|teams\.live\.com)\/\S+/gi,
+    ''
+  );
+
+  result = result.replace(
+    /https?:\/\/aka\.ms\/JoinTeamsMeeting\S*/gi,
+    ''
+  );
+
+  /*
+   * Remove help-link text that may survive independently.
+   */
+  result = result.replace(
+    /(?:^|\n)[ \t]*(?:\[[^\]]*\]\([^)]+\)|(?:Behöver du hjälp\?|Need help\?))[ \t]*(?:\|)?[ \t]*(?=\n|$)/gi,
+    '\n'
+  );
+
+  /*
+   * Clean up separator-only lines left by Outlook.
+   */
+  result = result.replace(
+    /(?:^|\n)[ \t]*[_\-—–]{20,}[ \t]*(?=\n|$)/g,
+    ''
+  );
+
+  return result
+    .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
